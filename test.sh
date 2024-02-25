@@ -25,10 +25,12 @@ function check_commit_type() {
     check_commit_kmd $commitID
     if [ commit_type_kmd -eq 1 ] ;then 
         echo "$commitID 为KMD"
+        install_kmd $commitID
     else
         check_commit_umd $commitID
         if [ commit_type_umd -eq 1 ] ;then 
             echo "$commitID 为UMD"
+            install_umd $commitID
         else
             "未识别到commitID，请重新检查commit拼写！"
             exit 1
@@ -85,21 +87,7 @@ function parse_args() {
             i)
                 commitID=$OPTARG
                 check_commit_type $commitID
-                if [ $commit_type_kmd -eq 0 ] && [ $commit_type_umd -eq 0 ];then 
-                    echo "未识别到commitID，请重新检查commit拼写！"
-                    exit 1
-                elif [ $commit_type_kmd -eq 1 ];then 
-                    
-                    install_kmd_flag=1
-                    exit 0 
-                elif [ $commit_type_umd -eq 1 ];then 
-                    echo "$commitID 为UMD"
-                    install_umd_flag=1
-                    exit 0 
-                else    
-                    usage
-                    exit 1
-                fi
+                if 
                 ;;
             h)
                 usage
