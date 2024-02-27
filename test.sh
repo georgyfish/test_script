@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 checkkmd=0
 checkumd=0
@@ -9,16 +10,63 @@ commit_type_umd=0
 install_kmd_flag=0
 install_umd_flag=0
 
+# modules=(pvrsrvkm mtgpu_kms mtgpu)
+modules=(mtgpu)
+files_dir=(etc lib usr)
+#remove kmd modules
+function rmmmod_kmd() {
+  for m in ${modules[@]}
+  do
+      if lsmod |grep ${m} > /dev/null 2>&1
+      then
+          rmmod ${m}
+          echo "[info] rmmod ${m} done."
+      else
+          echo "[INFO] ${m} was not loaded"  
+      fi
+  done
+}
+function show_pcie_vga() {
+
+}
 
 function show_deb_info() {
     echo "show_deb_info"
+    deb_info=$(dpkg -s musa musa_all_in_one 2>/dev/null|grep Version |awk -F: '{print $NF}')
+    if [[ $deb_info == '' ]]
+    then   
+        echo "[INFO] run 'dpkg -s musa musa_all_in_one' failed! Please check musa deb is installed."
+    else
+        ehco "[INFO] dpkg -s musa musa_all_in_one"
+        dpkg -s musa musa_all_in_one
+    fi
 }
 
 function show_kmd_info() {
     echo "show kmd info"
+    for m in ${modules[@]}
+    do 
+        if lsmod |grep "$m" > /dev/null 2>&1 
+        then 
+            echo "[INFO] $m loaded"
+
+        else
+            echo "[INFO] $m not loaded"
+            
+        fi
+    done
 }
+
 function show_umd_info() {
     echo "shwo umd info "
+    umd_commitInfo=$(export DISPLAY=:0.0 && glxinfo -B |grep -i "OpenGL version string"|awk '{print $NF}'|awk -F "@" '{print $1}')
+    if [[ $umd_commitInfo != "" ]]
+    then
+        echo "[INFO] 查询到umd commitID : $umd_commitInfo"
+    else
+        echo "[INFO] 无法查询到umd info"
+    fi
+
 }
 
 function check_commit_type() {
@@ -87,7 +135,7 @@ function parse_args() {
             i)
                 commitID=$OPTARG
                 check_commit_type $commitID
-                if 
+                
                 ;;
             h)
                 usage
