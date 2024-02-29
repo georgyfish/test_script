@@ -14,26 +14,26 @@ install_umd_flag=0
 modules=(mtgpu)
 files_dir=(etc lib usr)
 #remove kmd modules
-function rmmmod_kmd() {
-  for m in ${modules[@]}
-  do
-      if lsmod |grep ${m} > /dev/null 2>&1
-      then
-          rmmod ${m}
-          echo "[info] rmmod ${m} done."
-      else
-          echo "[INFO] ${m} was not loaded"  
-      fi
-  done
-}
+# function rmmmod_kmd() {
+#   for m in ${modules[@]}
+#   do
+#       if lsmod |grep ${m} > /dev/null 2>&1
+#       then
+#           rmmod ${m}
+#           echo "[info] rmmod ${m} done."
+#       else
+#           echo "[INFO] ${m} was not loaded"  
+#       fi
+#   done
+# }
 function show_pcie_vga() {
 
 }
 
 function show_deb_info() {
     echo "show_deb_info"
-    deb_info=$(dpkg -s musa musa_all_in_one 2>/dev/null|grep Version |awk -F: '{print $NF}')
-    if [[ $deb_info == '' ]]
+    musa_info=$(dpkg -s musa musa_all_in_one 2>/dev/null|grep Version |awk -F: '{print $NF}')
+    if [[ $musa_info == '' ]]
     then   
         echo "[INFO] run 'dpkg -s musa musa_all_in_one' failed! Please check musa deb is installed."
     else
@@ -49,22 +49,26 @@ function show_kmd_info() {
         if lsmod |grep "$m" > /dev/null 2>&1 
         then 
             echo "[INFO] $m loaded"
+            kmd_commit=$(grep "MTGPU Driver Version" /var/log/kern.log |tail -n 1 |awk -F: '{print $NF}' |awk '{print $1}')
+            echo "[INFO] KMD commitID : $kmd_commit"
 
         else
             echo "[INFO] $m not loaded"
             
         fi
     done
+
+
 }
 
 function show_umd_info() {
     echo "shwo umd info "
-    umd_commitInfo=$(export DISPLAY=:0.0 && glxinfo -B |grep -i "OpenGL version string"|awk '{print $NF}'|awk -F "@" '{print $1}')
-    if [[ $umd_commitInfo != "" ]]
+    umd_commit=$(export DISPLAY=:0.0 && glxinfo -B |grep -i "OpenGL version string"|awk '{print $NF}'|awk -F "@" '{print $1}')
+    if [[ $umd_commit != "" ]]
     then
-        echo "[INFO] 查询到umd commitID : $umd_commitInfo"
+        echo "[INFO] UMD commitID : $umd_commit"
     else
-        echo "[INFO] 无法查询到umd info"
+        echo "[INFO] 无法查询到umd info, please check Xorg status;"
     fi
 
 }
