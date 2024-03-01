@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-checkkmd=0
-checkumd=0
+component_kmd=0
+component_umd=0
 checkdeb=0
 summary=0 
 commit_type_kmd=0
@@ -37,7 +37,7 @@ function download_kmd() {
     wget $none_dkms_kmd_url -O KMD_${commitID}.tar.gz
     mkdir KMD_$commitID && tar -xvf KMD_${commitID}.tar.gz -C "KMD_${commitID}/"
     KMD_tar_kernel=$(find KMD_${commitID}/ -name mtgpu.ko |awk -F/ '{print $(NF-2)}')
-    if [[ $KMD_tar_kernel != $(uname -r) ]];
+    if [[ $KMD_tar_kernel != $(uname -r) ]];then
         echo "KMD_${commitID}.tar.gz内核${KMD_tar_kernel}与系统内核$(uname -r)不匹配,下载dkms KMD_${commitID}.deb"
         wget $dkms_kmd_deb_url -O KMD_${commitID}.deb
     fi
@@ -52,26 +52,21 @@ function download_umd() {
 }
 
 
-arch=$(uname -m)
-if [ $arch = 'aarch64' ];then 
-   arch='arm64'
-fi
-glvnd="-glvnd"
-# os是Kylin就使用非glvnd的umd；
-if [ $os_type = "Kylin" ];then 
-    glvnd=''
-fi
 
 function show_deb_info() {
     echo "show_deb_info"
-    musa_info=$(dpkg -s musa  2>/dev/null|grep Version |awk -F: '{print $NF}')
+    musa_info=$(dpkg -s musa  musa_all_in_one 2>/dev/null|grep Version |awk -F: '{print $NF}')
     mtgpu_info=$(dpkg -s mtgpu  2>/dev/null|grep Version |awk -F: '{print $NF}')
-    if [[ $musa_info == '' ]]
-    then   
-        echo "[INFO] run 'dpkg -s musa' failed! Please check musa deb is installed."
-    else
+    if [[ $musa_info == '' ]] && [[ $mtgpu_info == '' ]];then   
+        echo "[INFO] run 'dpkg -s musa musa_all_in_one mtgpu' failed! Please check musa deb is installed."
+    elif [[ $musa_info != '' ]];then
         ehco "[INFO] dpkg -s musa"
         dpkg -s musa 
+    elif [[ $mtgpu_info != '' ]];then
+        ehco "[INFO] dpkg -s mtgpu"
+        dpkg -s mtgpu
+    else 
+        echo "[ERROR] musa、mtgpu cannot install at the same time; Please check musa or mtgpu install status." 
     fi
 }
 
@@ -83,16 +78,14 @@ function show_kmd_info() {
         then 
             echo "[INFO] $m loaded"
             # kmd_commit=$(grep "MTGPU Driver Version" /var/log/kern.log |tail -n 1 |awk -F: '{print $NF}' |awk '{print $1}')
-            kmd_commit=$(grep "Driver Version" /sys/kernel/debug/musa/version|awk -F[ '{print $NF}'|awk -F] '{print $1}')
+            kmd_commit=$(sudo grep "Driver Version" /sys/kernel/debug/musa/version|awk -F[ '{print $NF}'|awk -F] '{print $1}')
             echo "[INFO] KMD commitID : $kmd_commit"
-
         else
-            echo "[INFO] $m not loaded"
+            echo "[ERROR] $m not loaded, Please check mtgpu.ko is loaded!"
+            exit 1
             
         fi
     done
-
-
 }
 
 function show_umd_info() {
@@ -102,7 +95,7 @@ function show_umd_info() {
     then
         echo "[INFO] UMD commitID : $umd_commit"
     else
-        echo "[INFO] 无法查询到umd info, please check Xorg status;"
+        echo "[ERROR] 无法查询到umd info, please check Xorg status;"
     fi
 
 }
@@ -134,38 +127,40 @@ function check_commit_umd() {
 
 function usage() {
     echo in usage
-    # 实现效果：
-    # $0  功能：检查出当前环境的commit，包括kmd和umd；安装指定commitID的kmd或umd；
-    # $0 -s                                         #检查当前环境的驱动信息，KMD、UMD commit信息；
-    # $0 -b  <daily/release/master/haiguang/kylin>  # 指定branch
-    # $0 -c  <all|kmd|umd>                          # 指定component ; all---->all in one;
-    # $0 -i  <commitID>  #检查commitID是kmd还是umd, 安装；
+    # 实现效果：检查出当前环境的commit，包括kmd和umd；安装指定commitID的kmd或umd；
     # $0 -s | [-c all|kmd|umd ] -b branch [-i commitID ] |-h 
-    echo "Usage: $0 -s | [-c all|kmd|umd ] | [-i commitID ] | -h"
+    echo "Usage: $0 -s | -b <daily/release/master/haiguang/kylin> -c <all|kmd|umd>  -i commitID | -h"
     echo "
--s      # show driver info summary;
--c      # kmd: check kmd commit info;
-        # umd: check umd commit info;
--i      # install kmd/umd commit;
+-s      # show driver info summary,include KMD/UMD COMMIT INFO;
+-b      # --branch  <develop/release/master/haiguang/kylin>
+-c      # component all/kmd/umd ;
+-i      # install commit;
 -h      # --help"
      
 }
 
 function parse_args() {
-    while getopts :sc:i:h option
+    while getopts :sb:c:i:h option
     do 
         case "$option" in
             s)
                 echo "-s"
                 summary=1
                 ;;
+            b) 
+                echo "-b" 
+                branch=$OPTARG
+                ;;
             c)
                 if [ "$OPTARG" = "kmd" ];
                 then 
-                    checkkmd=1
+                    component=kmd
                 elif [ "$OPTARG" = "umd" ];
                 then 
-                    checkumd=1
+                    component=kmd
+                elif [ "$OPTARG" = "all" ]    
+                then
+                    component=all
                 else
                     usage
                     exit 1
@@ -173,7 +168,7 @@ function parse_args() {
                 ;;
             i)
                 commitID=$OPTARG
-                check_commit_type $commitID
+                # check_commit_type $commitID
                 
                 ;;
             h)
@@ -213,17 +208,31 @@ function main() {
         show_kmd_info
         show_umd_info
         exit 0
-    elif [ $checkkmd -eq 1 ];then 
-        show_kmd_info
-        exit 0 
-    elif [ $checkumd -eq 1 ];then 
-        show_umd_info
-        exit 0 
-    else
-        exit 0
     fi
     
-    
+    if [ $component = 'all' ]
+    then
+        echo 
+    elif [[ $commitID != '' ]];then
+        download_${component} commitID
+    else
+        echo
+    fi
 }
 
+
+os_type=$(cat /etc/os-release |grep 'NAME'|grep -v "PRETTY_NAME"|grep -v  "CODENAME"|awk -F\" '{print $(NF-1)}')
+arch=$(uname -m)
+if [ $arch = 'aarch64' ];then 
+   arch='arm64'
+fi
+glvnd="-glvnd"
+# os是Kylin就使用非glvnd的umd；
+if [ $os_type = "Kylin" ];then 
+    glvnd=''
+fi
+ 
 main "$@"
+
+
+    
