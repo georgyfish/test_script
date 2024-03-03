@@ -66,7 +66,7 @@ function download_kmd() {
 function download_umd() {
     umd_url="${oss_url}/release-ci/gr-umd/${branch}/${commitID}_${arch}-mtgpu_linux-xorg-release-hw${glvnd}.tar.gz"
     wget $umd_url -O UMD_${commitID}${glvnd}.tar.gz
-    mkdir UMD_$commitID && tar -xvf UMD_${commitID}${glvnd}.tar.gz -C UMD_${commitID} && cd UMD_${commitID}/${arch}-mtgpu_linux-xorg-release/
+    mkdir UMD_$commitID && tar -xvf UMD_${commitID}${glvnd}.tar.gz -C UMD_${commitID}
 }
 
 # 安装KMD
@@ -102,9 +102,16 @@ function install_kmd() {
         done
     fi
     # 重启机器
-    echo "kmd安装完成，30秒内重启机器。"
-    sleep 30
-    sudo reboot
+    read -p "kmd安装完成，是否要重启机器？ [yY/nN]" answer
+    if [[ $answer == 'Y' ]] || [[ $answer = 'y' ]];then
+        echo "30秒内重启机器"
+        sleep 30
+        sudo reboot
+    elif [[ $answer == 'N' ]] || [[ $answer = 'n' ]];then
+        exit 0
+    else
+        echo "input error!"
+    fi
 }
 
 
@@ -114,11 +121,23 @@ function install_umd() {
     sudo systemctl stop lightdm
     commitID=$1
     cd UMD_${commitID}/${arch}-mtgpu_linux-xorg-release/
-    #卸载UMD
-    sudo ./install.sh -g -n -u .
-    #安装UMD
-    sudo ./install.sh -g -n -s .
-    sudo systemctl restart lightdm
+
+    if [[ $glvnd == "-glvnd" ]];then 
+        #glvnd umd安装方式
+        #卸载UMD
+        sudo ./install.sh -g -n -u .
+        #安装UMD
+        sudo ./install.sh -g -n -s .
+    else
+        #非glvnd umd安装方式
+        sudo set -i 's/basedir=/usr/lib/xorg/basedir=/usr/local/bin/g' /usr/bin/X
+        #卸载UMD
+        sudo ./install.sh -u .
+        #安装UMD
+        sudo ./install.sh -s .
+    fi
+
+    sudo systemctl start lightdm
 }
 
 function show_deb_info() {
