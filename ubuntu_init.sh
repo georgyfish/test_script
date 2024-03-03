@@ -51,7 +51,6 @@ function net_check() {
 	fi
 	test_ip=192.168.114.118
 	#检查是否有网络
-	test_ip=192.168.114.118
 	ping_result=`ping -c1 -W1 $test_ip > ping.txt 2>&1`
 	#ping一次，超时时间1秒，ping的通返回0，echo up，ping失败打印down
 	if [ $? -eq 0 ]
