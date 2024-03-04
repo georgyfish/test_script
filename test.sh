@@ -130,7 +130,8 @@ function install_umd() {
         sudo ./install.sh -g -n -s .
     else
         #非glvnd umd安装方式
-        sudo set -i 's/basedir=/usr/lib/xorg/basedir=/usr/local/bin/g' /usr/bin/X
+        # sudo sed -i 's/basedir=/usr/lib/xorg/basedir=/usr/local/bin/g' /usr/bin/X
+        sudo sed -i "s/lib\/xorg/local\/bin/" /usr/bin/X
         #卸载UMD
         sudo ./install.sh -u .
         #安装UMD
