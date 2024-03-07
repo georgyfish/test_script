@@ -25,7 +25,7 @@ function net_check() {
 	if [ $ip_addr != "127.0.0.1" ];then 
 		echo $ip_addr
 	else
-		echo "ip=$ip_addr,未检测到DHCP分配ip"
+		echo "[INFO] ip=$ip_addr,未检测到DHCP分配ip"
 		exit 1
 	fi
 	test_ip=$(echo $oss_url |awk -F "https://" '{print $NF}')
@@ -36,9 +36,9 @@ function net_check() {
 	#ping一次，超时时间1秒，ping的通返回0，echo up，ping失败打印down
 	if [ $? -eq 0 ]
 	then   
-    	echo "可以ping通$test_ip..."
+    	echo "[INFO] 可以ping通$test_ip"
 	else
-    	echo "无法ping通$test_ip..."
+    	echo "[ERROR] 无法ping通$test_ip"
     	exit 1
 	fi
 }
@@ -48,32 +48,40 @@ function download_all() {
 }
 
 function download_kmd() {
+    commitID=$1
     # kmd_url=oss/release-ci/gr-kmd/develop/${commitID}_1050u3_uos_arm64-mtgpu_linux-xorg-release-hw.tar.gz
     #KMD更换地址后 2023-12-18之后
     kmd_url="${oss_url}/sw-build/gr-kmd/${branch}/${commitID}/${commitID}_${arch}-mtgpu_linux-xorg-release-hw.tar.gz"
     # dkms_kmd_deb_url="${oss_url}/${commitID}/${commitID}_${arch}-mtgpu_linux-xorg-release-hw.deb"
+    echo "[INFO] Downloading KMD_${commitID}.tar.gz"
     wget $kmd_url -O KMD_${commitID}.tar.gz
     mkdir KMD_$commitID && tar -xvf KMD_${commitID}.tar.gz -C "KMD_${commitID}/"
     KMD_tar_kernel=$(find KMD_${commitID}/ -name mtgpu.ko |awk -F/ '{print $(NF-2)}')
     if [[ $KMD_tar_kernel != $(uname -r) ]];then
-        echo "KMD_${commitID}.tar.gz内核${KMD_tar_kernel}与系统内核$(uname -r)不匹配,下载dkms KMD_${commitID}.deb"
+        echo "[INFO] KMD_${commitID}.tar.gz内核${KMD_tar_kernel}与系统内核$(uname -r)不匹配;
+[INFO] Download dkms KMD_${commitID}.deb"
         kmd_url="${oss_url}/${commitID}/${commitID}_${arch}-mtgpu_linux-xorg-release-hw.deb"
         wget $kmd_url -O KMD_${commitID}.deb
         rm -rf KMD_${commitID}.tar.gz
     fi
+    echo "[INFO] Download KMD_${commitID} complete"
 }
 
 function download_umd() {
+    commitID=$1
     umd_url="${oss_url}/release-ci/gr-umd/${branch}/${commitID}_${arch}-mtgpu_linux-xorg-release-hw${glvnd}.tar.gz"
+    echo "[INFO] Download  UMD_${commitID}"
     wget $umd_url -O UMD_${commitID}${glvnd}.tar.gz
     mkdir UMD_$commitID && tar -xvf UMD_${commitID}${glvnd}.tar.gz -C UMD_${commitID}
+    echo "[INFO] Download  UMD_${commitID} complete"
 }
 
 # 安装KMD
 function install_kmd() {
-    echo "sudo systemctl stop lightdm"
+    echo "[INFO] sudo systemctl stop lightdm"
     sudo systemctl stop lightdm
     sudo rmmod mtgpu
+    commitID=$1
     if [ -e "/lib/modules/`uname -r`/updates/dkms/mtgpu.ko" ];then 
         sudo mv /lib/modules/`uname -r`/updates/dkms/mtgpu.ko /lib/modules/`uname -r`/updates/dkms/mtgpu.ko.bak
     fi
@@ -81,20 +89,24 @@ function install_kmd() {
     #下载的KMD内核版本与系统内核版本一致就直接替换安装，否则使用dkms deb安装
     if find ./ -name KMD_${commitID}.tar.gz;
     then 
-        echo "直接替换KMD"
+        echo "[INFO] 直接替换KMD"
+        sudo modprobe -rv mtgpu
         sudo cp $(find KMD_${commitID}/${arch}-mtgpu_linux-xorg-release/ -name mtgpu.ko) /lib/modules/`uname -r`/extra/
         sudo depmod
         sudo update-initramfs -u -k `uname -r`
     else
-        echo "安装dkms mtgpu deb"
+        echo "[INFO] 安装dkms mtgpu deb, 请确保musa驱动已卸载"
         while :
         do
+            show_umd_info  && download_umd  $umd_commit && install_umd $umd_commit
             sudo dpkg -i ${commitID}_${arch}-mtgpu_linux-xorg-release-hw.deb
             if [ $? -ne 0 ];then 
-                echo "安装KMD mtgpu dkms deb失败...musa包与kmd dkms deb mtgpu包冲突，需卸载musa包"
+                echo "[INFO] 安装KMD mtgpu dkms deb失败...musa包与kmd dkms deb mtgpu包冲突，需卸载musa包"
                 dpkg -s musa
                 if [ $? != 1 ];then
+                    echo "[INFO] sudo dpkg -P musa"
                     sudo dpkg -P musa;
+                    sudo rm -rf /usr/lib/$(uname -m)-linux-gnu/musa
                 fi
             else
                 break
@@ -108,10 +120,14 @@ function install_kmd() {
         sleep 30
         sudo reboot
     elif [[ $answer == 'N' ]] || [[ $answer = 'n' ]];then
+        echo "执行modprobe -v mtgpu"
+        modprobe -v mtgpu
         exit 0
     else
         echo "input error!"
     fi
+    echo "[INFO] sudo systemctl start lightdm"
+    sudo systemctl start lightdm
 }
 
 
@@ -130,14 +146,12 @@ function install_umd() {
         sudo ./install.sh -g -n -s .
     else
         #非glvnd umd安装方式
-        sudo set -i 's/basedir=/usr/lib/xorg/basedir=/usr/local/bin/g' /usr/bin/X
+        sudo sed -i 's/lib\/xorg/local\/bin/g' /usr/bin/X
         #卸载UMD
         sudo ./install.sh -u .
         #安装UMD
         sudo ./install.sh -s .
     fi
-
-    sudo systemctl start lightdm
 }
 
 function show_deb_info() {
@@ -185,7 +199,7 @@ function show_umd_info() {
     else
         echo "[ERROR] 无法查询到umd info, please check Xorg status;"
     fi
-
+    return $umd_commit
 }
 
 
@@ -289,7 +303,7 @@ function main() {
         fi
         net_check
         download_${component} $commitID
-        #install_${component}
+        install_${component} $commitID
     fi
     
     
