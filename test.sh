@@ -32,7 +32,7 @@ function net_check() {
     # test_ip="www.baidu.com"
     echo $test_ip
 	#检查是否有网络
-	ping_result=$(ping -c1 -W1 $test_ip > ping.txt 2>&1)
+	ping_result=$(ping -c1 -W1 $test_ip >> ping.txt 2>&1)
 	#ping一次，超时时间1秒，ping的通返回0，echo up，ping失败打印down
 	if [ $? -eq 0 ]
 	then   
@@ -60,7 +60,7 @@ function download_kmd() {
     if [[ $KMD_tar_kernel != $(uname -r) ]];then
         echo "[INFO] KMD_${commitID}.tar.gz内核${KMD_tar_kernel}与系统内核$(uname -r)不匹配;
 [INFO] Download dkms KMD_${commitID}.deb"
-        kmd_url="${oss_url}/${commitID}/${commitID}_${arch}-mtgpu_linux-xorg-release-hw.deb"
+        kmd_url="${oss_url}/sw-build/gr-kmd/${branch}/${commitID}/${commitID}_${arch}-mtgpu_linux-xorg-release-hw.deb"
         wget $kmd_url -O KMD_${commitID}.deb
         rm -rf KMD_${commitID}.tar.gz
     fi
@@ -87,7 +87,7 @@ function install_kmd() {
     fi
     sudo mkdir -p /lib/modules/`uname -r`/extra/
     #下载的KMD内核版本与系统内核版本一致就直接替换安装，否则使用dkms deb安装
-    if find ./ -name KMD_${commitID}.tar.gz;
+    if [ -e KMD_${commitID}.tar.gz ];
     then 
         echo "[INFO] 直接替换KMD"
         sudo modprobe -rv mtgpu
@@ -96,33 +96,39 @@ function install_kmd() {
         sudo update-initramfs -u -k `uname -r`
     else
         echo "[INFO] 安装dkms mtgpu deb, 请确保musa驱动已卸载"
-        while :
-        do
-            show_umd_info  && download_umd  $umd_commit && install_umd $umd_commit
-            sudo dpkg -i ${commitID}_${arch}-mtgpu_linux-xorg-release-hw.deb
-            if [ $? -ne 0 ];then 
-                echo "[INFO] 安装KMD mtgpu dkms deb失败...musa包与kmd dkms deb mtgpu包冲突，需卸载musa包"
-                dpkg -s musa
-                if [ $? != 1 ];then
-                    echo "[INFO] sudo dpkg -P musa"
-                    sudo dpkg -P musa;
-                    sudo rm -rf /usr/lib/$(uname -m)-linux-gnu/musa
-                fi
-            else
-                break
-            fi
-        done
+        # while :
+        # do
+
+        # if [ $? -ne 0 ];then 
+        echo "[INFO] 安装KMD mtgpu dkms deb失败...musa包与kmd dkms deb mtgpu包冲突，需卸载musa包"
+        show_umd_info
+        dpkg -s musa
+        if [ $? != 1 ];then
+            echo "[INFO] sudo dpkg -P musa"
+            sudo dpkg -P musa;
+            sudo rm -rf /usr/lib/$(uname -m)-linux-gnu/musa
+        fi
+        read -p "musa all in one deb卸载完成，请输入要安装的umd commitID:" umd_commit
+        download_umd  $umd_commit && install_umd $umd_commit
+        sudo rm -rf /etc/modprobe.d/mtgpu.conf && wget -q --no-check-certificate https://oss.mthreads.com/product-release/cts/mtgpu_perf.conf -O mtgpu.conf && sudo cp mtgpu.conf /etc/modprobe.d
+        commitID=$1
+        echo "[INFO] sudo dpkg -i ${run_path}/KMD_${commitID}.deb "
+        sudo dpkg -i ${run_path}/KMD_${commitID}.deb 
+        # else
+        #     break
+        # fi
+        # done
     fi
     # 重启机器
     read -p "kmd安装完成，是否要重启机器？ [yY/nN]" answer
     if [[ $answer == 'Y' ]] || [[ $answer = 'y' ]];then
-        echo "30秒内重启机器"
-        sleep 30
+        echo "重启机器"
+        sleep 2
         sudo reboot
     elif [[ $answer == 'N' ]] || [[ $answer = 'n' ]];then
         echo "执行modprobe -v mtgpu"
-        modprobe -v mtgpu
-        exit 0
+        sudo depmod -a
+        sudo modprobe -v mtgpu
     else
         echo "input error!"
     fi
@@ -137,7 +143,7 @@ function install_umd() {
     sudo systemctl stop lightdm
     commitID=$1
     cd UMD_${commitID}/${arch}-mtgpu_linux-xorg-release/
-
+    echo "[INFO] install UMD..."
     if [[ $glvnd == "-glvnd" ]];then 
         #glvnd umd安装方式
         #卸载UMD
@@ -146,17 +152,15 @@ function install_umd() {
         sudo ./install.sh -g -n -s .
     else
         #非glvnd umd安装方式
-<<<<<<< HEAD
         sudo sed -i 's/lib\/xorg/local\/bin/g' /usr/bin/X
-=======
         # sudo sed -i 's/basedir=/usr/lib/xorg/basedir=/usr/local/bin/g' /usr/bin/X
-        sudo sed -i "s/lib\/xorg/local\/bin/" /usr/bin/X
->>>>>>> dc7dcf813fd8154fcdf68cefc1f485fd0bf4a429
+
         #卸载UMD
         sudo ./install.sh -u .
         #安装UMD
         sudo ./install.sh -s .
     fi
+    ehco 
 }
 
 function show_deb_info() {
@@ -166,14 +170,15 @@ function show_deb_info() {
     if [[ $musa_info == '' ]] && [[ $mtgpu_info == '' ]];then   
         echo "[INFO] run 'dpkg -s musa musa_all_in_one mtgpu' failed! Please check musa deb is installed."
     elif [[ $musa_info != '' ]];then
-        ehco "[INFO] dpkg -s musa"
+        echo "[INFO] dpkg -s musa"
         dpkg -s musa 
     elif [[ $mtgpu_info != '' ]];then
-        ehco "[INFO] dpkg -s mtgpu"
+        echo "[INFO] dpkg -s mtgpu"
         dpkg -s mtgpu
     else 
         echo "[ERROR] musa、mtgpu cannot install at the same time; Please check musa or mtgpu install status." 
     fi
+    echo 
 }
 
 function show_kmd_info() {
@@ -188,10 +193,11 @@ function show_kmd_info() {
             # kmd commit 只显示7位；检查安装成功时只能对比前7位字母数字；
             echo "[INFO] KMD commitID : $kmd_commit"
         else
-            echo "[ERROR] $m not loaded, Please check mtgpu.ko is loaded!"
+            echo "[ERROR] $m not loaded, Please run 'sudo lsmod |grep mtgpu' to check mtgpu.ko is loaded!"
             exit 1
             
         fi
+        echo 
     done
 }
 
@@ -204,7 +210,7 @@ function show_umd_info() {
     else
         echo "[ERROR] 无法查询到umd info, please check Xorg status;"
     fi
-    return $umd_commit
+    echo 
 }
 
 
@@ -237,10 +243,10 @@ function parse_args() {
             c)
                 if [ "$OPTARG" = "kmd" ];
                 then 
-                    component=kmd
+                    component='kmd'
                 elif [ "$OPTARG" = "umd" ];
                 then 
-                    component=kmd
+                    component='umd'
                 elif [ "$OPTARG" = "all" ]    
                 then
                     component=all
@@ -309,12 +315,13 @@ function main() {
         net_check
         download_${component} $commitID
         install_${component} $commitID
+        sudo systemctl restart lightdm
     fi
     
     
 }
 
-
+run_path=$(pwd)
 os_type=$(cat /etc/os-release |grep 'NAME'|grep -v "PRETTY_NAME"|grep -v  "CODENAME"|awk -F\" '{print $(NF-1)}')
 arch=$(uname -m)
 if [ $arch = 'aarch64' ];then 
