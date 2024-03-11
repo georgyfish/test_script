@@ -78,30 +78,26 @@ function download_umd() {
 
 # 安装KMD
 function install_kmd() {
-    echo "[INFO] sudo systemctl stop lightdm"
-    sudo systemctl stop lightdm
-    sudo rmmod mtgpu
+
+    # sudo rmmod mtgpu
     commitID=$1
-    if [ -e "/lib/modules/`uname -r`/updates/dkms/mtgpu.ko" ];then 
-        sudo mv /lib/modules/`uname -r`/updates/dkms/mtgpu.ko /lib/modules/`uname -r`/updates/dkms/mtgpu.ko.bak
-    fi
-    sudo mkdir -p /lib/modules/`uname -r`/extra/
+    sudo modprobe -rv mtgpu
     #下载的KMD内核版本与系统内核版本一致就直接替换安装，否则使用dkms deb安装
     if [ -e KMD_${commitID}.tar.gz ];
     then 
         echo "[INFO] 直接替换KMD"
-        sudo modprobe -rv mtgpu
+        if [ -e "/lib/modules/`uname -r`/updates/dkms/mtgpu.ko" ];then 
+            sudo mv /lib/modules/`uname -r`/updates/dkms/mtgpu.ko /lib/modules/`uname -r`/updates/dkms/mtgpu.ko.bak
+        fi
+        sudo mkdir -p /lib/modules/`uname -r`/extra/
+        # sudo modprobe -rv mtgpu
         sudo cp $(find KMD_${commitID}/${arch}-mtgpu_linux-xorg-release/ -name mtgpu.ko) /lib/modules/`uname -r`/extra/
-        sudo depmod
-        sudo update-initramfs -u -k `uname -r`
+        # sudo depmod
+        # sudo update-initramfs -u -k `uname -r`
     else
         echo "[INFO] 安装dkms mtgpu deb, 请确保musa驱动已卸载"
-        # while :
-        # do
-
-        # if [ $? -ne 0 ];then 
         echo "[INFO] 安装KMD mtgpu dkms deb失败...musa包与kmd dkms deb mtgpu包冲突，需卸载musa包"
-        show_umd_info
+        # show_umd_info
         dpkg -s musa
         if [ $? != 1 ];then
             echo "[INFO] sudo dpkg -P musa"
@@ -114,33 +110,46 @@ function install_kmd() {
         commitID=$1
         echo "[INFO] sudo dpkg -i ${run_path}/KMD_${commitID}.deb "
         sudo dpkg -i ${run_path}/KMD_${commitID}.deb 
-        # else
-        #     break
-        # fi
-        # done
+
     fi
     # 重启机器
-    read -p "kmd安装完成，是否要重启机器？ [yY/nN]" answer
-    if [[ $answer == 'Y' ]] || [[ $answer = 'y' ]];then
+    read -p "kmd安装完成，是否要重启机器？[yY/nN]: " answer
+    case $answer in 
+    Y | y)
         echo "重启机器"
         sleep 2
+        sudo depmod -a
+        sudo update-initramfs -u -k `uname -r`
         sudo reboot
-    elif [[ $answer == 'N' ]] || [[ $answer = 'n' ]];then
+        ;;
+    N | n)
         echo "执行modprobe -v mtgpu"
         sudo depmod -a
         sudo modprobe -v mtgpu
-    else
+        ;;
+    *)
         echo "input error!"
-    fi
-    echo "[INFO] sudo systemctl start lightdm"
-    sudo systemctl start lightdm
+        ;;
+    esac
+    # if [[ $answer == 'Y' ]] || [[ $answer = 'y' ]];then
+    #     echo "重启机器"
+    #     sleep 2
+    #     sudo reboot
+    # elif [[ $answer == 'N' ]] || [[ $answer = 'n' ]];then
+    #     echo "执行modprobe -v mtgpu"
+    #     sudo depmod -a
+    #     sudo modprobe -v mtgpu
+    # else
+    #     echo "input error!"
+    # fi
+    echo 
 }
 
 
 
 #安装umd
 function install_umd() {
-    sudo systemctl stop lightdm
+    # sudo systemctl stop lightdm
     commitID=$1
     cd UMD_${commitID}/${arch}-mtgpu_linux-xorg-release/
     echo "[INFO] install UMD..."
@@ -160,7 +169,7 @@ function install_umd() {
         #安装UMD
         sudo ./install.sh -s .
     fi
-    ehco 
+    echo 
 }
 
 function show_deb_info() {
@@ -313,8 +322,11 @@ function main() {
             fi
         fi
         net_check
+        echo "[INFO] sudo systemctl stop lightdm"
+        sudo systemctl stop lightdm
         download_${component} $commitID
         install_${component} $commitID
+        echo "[INFO] sudo systemctl restart lightdm"
         sudo systemctl restart lightdm
     fi
     
