@@ -173,7 +173,8 @@ function install_umd() {
 }
 
 function show_deb_info() {
-    echo "show_deb_info"
+    # echo "show_deb_info"
+    FenGeLine "DEB INFO"
     musa_info=$(dpkg -s musa  musa_all_in_one 2>/dev/null|grep Version |awk -F: '{print $NF}')
     mtgpu_info=$(dpkg -s mtgpu  2>/dev/null|grep Version |awk -F: '{print $NF}')
     if [[ $musa_info == '' ]] && [[ $mtgpu_info == '' ]];then   
@@ -190,8 +191,17 @@ function show_deb_info() {
     echo 
 }
 
+function FenGeLine() {
+    str="="
+    # ScreenLen=$(stty size |awk '{print $2}')
+    ScreenLen=80
+    TitleLen=$(echo -n $1 |wc -c)
+    LineLen=$(((${ScreenLen} - ${TitleLen}) / 2 ))
+    yes $str |sed ''''${LineLen}'''q' |tr -d "\n" && echo -n $1 && yes $str |sed ''''${LineLen}'''q' |tr -d "\n" && echo
+}
 function show_kmd_info() {
-    echo "show kmd info"
+    #echo "KMD INFO"
+    FenGeLine "KMD INFO"
     for m in ${modules[@]}
     do 
         if lsmod |grep "$m" > /dev/null 2>&1 
@@ -206,12 +216,13 @@ function show_kmd_info() {
             exit 1
             
         fi
-        echo 
     done
+    echo 
 }
 
 function show_umd_info() {
-    echo "shwo umd info "
+#    echo "shwo umd info "
+    FenGeLine "UMD INFO"
     umd_commit=$(export DISPLAY=:0.0 && glxinfo -B |grep -i "OpenGL version string"|awk '{print $NF}'|awk -F "@" '{print $1}')
     if [[ $umd_commit != "" ]]
     then
