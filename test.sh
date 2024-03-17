@@ -58,8 +58,7 @@ function download_kmd() {
     mkdir KMD_$commitID && tar -xvf KMD_${commitID}.tar.gz -C "KMD_${commitID}/"
     KMD_tar_kernel=$(find KMD_${commitID}/ -name mtgpu.ko |awk -F/ '{print $(NF-2)}')
     if [[ $KMD_tar_kernel != $(uname -r) ]];then
-        echo "[INFO] KMD_${commitID}.tar.gz内核${KMD_tar_kernel}与系统内核$(uname -r)不匹配;
-[INFO] Download dkms KMD_${commitID}.deb"
+        echo -e "[INFO] KMD_${commitID}.tar.gz内核${KMD_tar_kernel}与系统内核$(uname -r)不匹配;\n[INFO] Download dkms KMD_${commitID}.deb"
         kmd_url="${oss_url}/sw-build/gr-kmd/${branch}/${commitID}/${commitID}_${arch}-mtgpu_linux-xorg-release-hw.deb"
         wget $kmd_url -O KMD_${commitID}.deb
         rm -rf KMD_${commitID}.tar.gz
@@ -72,16 +71,21 @@ function download_umd() {
     umd_url="${oss_url}/release-ci/gr-umd/${branch}/${commitID}_${arch}-mtgpu_linux-xorg-release-hw${glvnd}.tar.gz"
     echo "[INFO] Download  UMD_${commitID}"
     wget $umd_url -O UMD_${commitID}${glvnd}.tar.gz
+    if [ $? -ne 0 ];then 
+        echo -e "[INFO] $umd_url download failed! \n[INFO] Please check whether oss/release-ci/gr-umd/${branch}/${commitID}_${arch}-mtgpu_linux-xorg-release-hw${glvnd}.tar.gz is there!"
+        exit 1
+    fi
     mkdir UMD_$commitID && tar -xvf UMD_${commitID}${glvnd}.tar.gz -C UMD_${commitID}
     echo "[INFO] Download  UMD_${commitID} complete"
 }
 
 # 安装KMD
 function install_kmd() {
-
+    echo "[INFO] Start install KMD"
     # sudo rmmod mtgpu
     commitID=$1
-    sudo modprobe -rv mtgpu
+    sudo rmmod mtgpu
+    # sudo modprobe -rv mtgpu
     #下载的KMD内核版本与系统内核版本一致就直接替换安装，否则使用dkms deb安装
     if [ -e KMD_${commitID}.tar.gz ];
     then 
@@ -103,14 +107,26 @@ function install_kmd() {
             echo "[INFO] sudo dpkg -P musa"
             sudo dpkg -P musa;
             sudo rm -rf /usr/lib/$(uname -m)-linux-gnu/musa
+            echo "[INFO] musa all in one deb卸载完成"
         fi
-        read -p "musa all in one deb卸载完成，请输入要安装的umd commitID:" umd_commit
-        download_umd  $umd_commit && install_umd $umd_commit
-        sudo rm -rf /etc/modprobe.d/mtgpu.conf && wget -q --no-check-certificate https://oss.mthreads.com/product-release/cts/mtgpu_perf.conf -O mtgpu.conf && sudo cp mtgpu.conf /etc/modprobe.d
+        # check_umd_install 
+        if [ ! -d /usr/lib/$(uname -m)-linux-gnu/musa ] ;then
+            echo "UMD musa package is not installed;" 
+            read -p "请输入要安装的UMD commitID:" umd_commit
+                if [[ $umd_commit == '' ]];then
+                    echo "[ERROR] You need install UMD package before install KMD!"
+                    exit 1
+                fi
+            download_umd  $umd_commit && install_umd $umd_commit
+        fi
         commitID=$1
         echo "[INFO] sudo dpkg -i ${run_path}/KMD_${commitID}.deb "
         sudo dpkg -i ${run_path}/KMD_${commitID}.deb 
 
+    fi
+    if [ ! -e /etc/modprobe.d/mtgpu.conf ];then 
+        # wget -q --no-check-certificate https://oss.mthreads.com/product-release/cts/mtgpu_perf.conf -O mtgpu.conf && sudo cp mtgpu.conf /etc/modprobe.d
+        echo -e "options mtgpu display=mt EnableFWContextSwitch=27"  |sudo tee /etc/modprobe.d/mtgpu.conf
     fi
     # 重启机器
     read -p "kmd安装完成，是否要重启机器？[yY/nN]: " answer
@@ -124,31 +140,21 @@ function install_kmd() {
         ;;
     N | n)
         echo "执行modprobe -v mtgpu"
-        sudo depmod -a
+        sudo depmod 
         sudo modprobe -v mtgpu
         ;;
     *)
         echo "input error!"
         ;;
     esac
-    # if [[ $answer == 'Y' ]] || [[ $answer = 'y' ]];then
-    #     echo "重启机器"
-    #     sleep 2
-    #     sudo reboot
-    # elif [[ $answer == 'N' ]] || [[ $answer = 'n' ]];then
-    #     echo "执行modprobe -v mtgpu"
-    #     sudo depmod -a
-    #     sudo modprobe -v mtgpu
-    # else
-    #     echo "input error!"
-    # fi
-    echo 
+    echo "[INFO] KMD install complete"
 }
 
 
 
 #安装umd
 function install_umd() {
+    echo "[INFO] Start install UMD"
     # sudo systemctl stop lightdm
     commitID=$1
     cd UMD_${commitID}/${arch}-mtgpu_linux-xorg-release/
@@ -161,15 +167,23 @@ function install_umd() {
         sudo ./install.sh -g -n -s .
     else
         #非glvnd umd安装方式
+        # 指向/usr/local/bin/Xorg （非glvnd UMD包安装路径）
         sudo sed -i 's/lib\/xorg/local\/bin/g' /usr/bin/X
-        # sudo sed -i 's/basedir=/usr/lib/xorg/basedir=/usr/local/bin/g' /usr/bin/X
-
         #卸载UMD
         sudo ./install.sh -u .
         #安装UMD
         sudo ./install.sh -s .
     fi
-    echo 
+    if [[ ! -e /etc/ld.so.conf.d/00-mtgpu.conf ]];then
+        # echo "/usr/lib/$arch-linux-gnu/musa" > /etc/ld.so.conf.d/00-mtgpu.conf
+        echo -e "/usr/lib/$arch-linux-gnu/musa" |sudo tee /etc/ld.so.conf.d/00-mtgpu.conf
+        if [[ "$(uname -m)" == "aarch64" ]]; then
+            # echo "/usr/lib/arm-linux-gnueabihf/musa" >> /etc/ld.so.conf.d/00-mtgpu.conf
+            echo -e "/usr/lib/arm-linux-gnueabihf/musa" |sudo tee -a /etc/ld.so.conf.d/00-mtgpu.conf
+        fi
+    fi
+    sudo ldconfig
+    echo "[INFO] UMD install complete"
 }
 
 function show_deb_info() {
