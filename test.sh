@@ -55,6 +55,10 @@ function download_kmd() {
     # dkms_kmd_deb_url="${oss_url}/${commitID}/${commitID}_${arch}-mtgpu_linux-xorg-release-hw.deb"
     echo "[INFO] Downloading KMD_${commitID}.tar.gz"
     wget $kmd_url -O KMD_${commitID}.tar.gz
+    if [ $? -ne 0 ];then 
+        echo -e "[INFO] $kmd_url download failed! \n[INFO] Please check whether $kmd_url is there!"
+        exit 1
+    fi
     mkdir KMD_$commitID && tar -xvf KMD_${commitID}.tar.gz -C "KMD_${commitID}/"
     KMD_tar_kernel=$(find KMD_${commitID}/ -name mtgpu.ko |awk -F/ '{print $(NF-2)}')
     if [[ $KMD_tar_kernel != $(uname -r) ]];then
