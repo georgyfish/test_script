@@ -33,22 +33,42 @@ def get_deb_version(branch,begin_date,end_date):
         # print(rs[0])
         rs =  rs[0].decode().strip()
         out_list = rs.splitlines()
-        result[work_date] = out_list[0]
+        result[work_date][0]= out_list[0]
+        result[work_date][1]= out_list[1]
+    for work_date,driver_version in result.items():
+        driver_name = f"{driver_version[0]}+dkms+glvnd-Ubuntu_amd64.deb"
+        driver_url = f"https://oss.mthreads.com/product-release/{branch}/{work_date}/{driver_name}"
+        result[work_date][2] = driver_url
+        result[work_date][3] = driver_name
     print(result)
     return result
 
 #download driver && install 
 def install_driver(branch,begin_date,end_date):
-    driver_lic = get_deb_version(branch,begin_date,end_date)
-    swqa_ssh_login_cmd = "sshpass -p gfx123456 ssh swqa@192.168.114.8 -o StrictHostKeyChecking=no"
-    for work_date,driver_version in driver_lic.items():
-        driver_name = f"{driver_version}+dkms+glvnd-Ubuntu_amd64.deb"
-        driver_url = f"https://oss.mthreads.com/product-release/{branch}/{work_date}/{driver_name}"
+    result = {}
+    driver_dic = get_deb_version(branch,begin_date,end_date)
+    date_list = list(get_deb_version(branch,begin_date,end_date).keys())
+    driver_url_list = list(get_deb_version(branch,begin_date,end_date).values())
+    left = 0
+    right = len(driver_url_list) - 1
+    Test_Host_IP = "192.168.114.8"
+    for i in [left,right]:
+        swqa_ssh_login_cmd = f"sshpass -p gfx123456 ssh swqa@{Test_Host_IP} -o StrictHostKeyChecking=no"
+        os.system(f"{swqa_ssh_login_cmd} 'cd /home/swqa/ && wget --no-check-certificate -q {driver_url_list[i][2]} -O {driver_url_list[i][-1]}' && sudo dpkg -i {driver_url_list[i][-1]} && sudo reboot")
+        time.sleep(150)
+        try:
+            for i in range(3):
+                # time.sleep(10)
+                ping_rs = os.system(f"timeout 5 ping {Test_Host_IP} -c 1")
+                if ping_rs == 0 :
+                    break
+        except:
+            print(f"ping {Test_Host_IP} fail!")
+            exit()
 
-        cmd = f'''
-            {swqa_ssh_login_cmd} 'cd /home/swqa/ && wget --no-check-certificate -q {driver_url} '
-        '''
-        os.system(cmd)
+        rs = input(f"{driver_url_list[i][-1]}已安装，请执行测试并输入测试结果：")
+        result[date_list[i]] = rs
+
 
 
 
