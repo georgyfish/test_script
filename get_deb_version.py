@@ -33,28 +33,32 @@ def get_deb_version(branch,begin_date,end_date):
         # print(rs[0])
         rs =  rs[0].decode().strip()
         out_list = rs.splitlines()
-        result[work_date][0]= out_list[0]
-        result[work_date][1]= out_list[1]
+        result[work_date] = []
+        # print(out_list)
+        result[work_date].append(out_list[0])
+        result[work_date].append(out_list[1]) 
     for work_date,driver_version in result.items():
         driver_name = f"{driver_version[0]}+dkms+glvnd-Ubuntu_amd64.deb"
         driver_url = f"https://oss.mthreads.com/product-release/{branch}/{work_date}/{driver_name}"
-        result[work_date][2] = driver_url
-        result[work_date][3] = driver_name
+        result[work_date].append(driver_url)
+        result[work_date].append(driver_name)
     print(result)
     return result
 
 #download driver && install 
-def install_driver(branch,begin_date,end_date):
+def install_driver(driver_dic,Test_Host_IP):
     result = {}
-    driver_dic = get_deb_version(branch,begin_date,end_date)
-    date_list = list(get_deb_version(branch,begin_date,end_date).keys())
-    driver_url_list = list(get_deb_version(branch,begin_date,end_date).values())
+    date_list = list(driver_dic.keys())
+    driver_url_list = list(driver_dic.values()) 
     left = 0
     right = len(driver_url_list) - 1
-    Test_Host_IP = "192.168.114.8"
-    for i in [left,right]:
+    
+    for i in range(len(date_list)):
         swqa_ssh_login_cmd = f"sshpass -p gfx123456 ssh swqa@{Test_Host_IP} -o StrictHostKeyChecking=no"
-        os.system(f"{swqa_ssh_login_cmd} 'cd /home/swqa/ && wget --no-check-certificate -q {driver_url_list[i][2]} -O {driver_url_list[i][-1]}' && sudo dpkg -i {driver_url_list[i][-1]} && sudo reboot")
+        print('=='*10 + f"Download {driver_url_list[i][2]}" + '=='*10)
+        os.system(f"{swqa_ssh_login_cmd} 'cd /home/swqa/ && wget --no-check-certificate -q {driver_url_list[i][2]} -O {driver_url_list[i][-1]}'")
+        print('=='*10 +  f"sudo dpkg -i /home/swqa/{driver_url_list[i][-1]} && sudo reboot" + '=='*10)
+        os.system(f"{swqa_ssh_login_cmd} 'sudo dpkg -i /home/swqa/{driver_url_list[i][-1]} && sudo reboot'")
         time.sleep(150)
         try:
             for i in range(3):
@@ -65,13 +69,20 @@ def install_driver(branch,begin_date,end_date):
         except:
             print(f"ping {Test_Host_IP} fail!")
             exit()
-
+        # 安装驱动后需手动测试，并输入测试结果：
         rs = input(f"{driver_url_list[i][-1]}已安装，请执行测试并输入测试结果：")
         result[date_list[i]] = rs
+    # return result
+
+    if result[date_list[left]] == result[date_list[right]]:
+        print("此区间内，第一个元素和最后一个元素的结果相等，请确认")
+        return -1
 
 
 
 
 
 if __name__ == '__main__':
-    install_driver('develop','20240301', '20240305')
+    driver_dic = get_deb_version('develop','20240326', '20240327')
+    Test_Host_IP = "192.168.114.55"
+    # install_driver(driver_dic,Test_Host_IP)
