@@ -8,9 +8,6 @@ from get_deb_version import get_deb_version
 # driver_dic = {'20240326': ['musa_2024.03.26-D+10129', 'https://oss.mthreads.com/release-ci/repo_tags/20240326.txt', 'https://oss.mthreads.com/product-release/develop/20240326/musa_2024.03.26-D+10129+dkms+glvnd-Ubuntu_amd64.deb', 'musa_2024.03.26-D+10129+dkms+glvnd-Ubuntu_amd64.deb'], '20240327': ['musa_2024.03.27-D+10151', 'https://oss.mthreads.com/release-ci/repo_tags/20240327.txt', 'https://oss.mthreads.com/product-release/develop/20240327/musa_2024.03.27-D+10151+dkms+glvnd-Ubuntu_amd64.deb', 'musa_2024.03.27-D+10151+dkms+glvnd-Ubuntu_amd64.deb']}
 # lis1 = ["commit0","commit1","commit2","commit3","commit4","commit5","commit6","commit7","commit8","commit9","commit10","commit11","commit12"]
 # dic1 = {"commit0":"true","commit1":"true","commit2":"true","commit3":"true","commit4":"true","commit5":"true","commit6":"true","commit7":"true","commit8":"true","commit9":"true","commit10":"true","commit11":"true","commit12":"true"}
-# lis1 = []
-# for i in driver_info_dic.values():
-#     lis1.append(i[0]) 
 
 def install_driver(driver_info_dic,Test_Host_IP,index):
     driver_url_list = list(driver_info_dic.values()) 
@@ -43,10 +40,12 @@ def middle_check(driver_info_dic):
     count = 0
     result = []
     lis1 = []
+    lis2 = []
     dic1 = {}
     for i in driver_info_dic.values():
         lis1.append(i[0]) 
-    # lis1 = list(dic1.keys())
+    for i in driver_info_dic.values():
+        lis2.append(i[1]) 
     right = len(lis1) - 1
     dic1[lis1[left]] = install_driver(driver_info_dic,Test_Host_IP,left)
     dic1[lis1[right]] = install_driver(driver_info_dic,Test_Host_IP,right)
@@ -73,7 +72,11 @@ def middle_check(driver_info_dic):
     else:
         # print(f"count={count}")
         print(f"使用二分法{count}次确认，定位到问题引入范围是 {lis1[left]}(不发生)-{lis1[right]}(发生)之间引入") 
-        result = [lis1[left],lis1[right]]
+        
+        print(f"对应的deb的repo_tag为{lis2[left]},{lis2[right]}")
+        result = {lis1[left]:lis2[left],lis1[right]:lis2[left]}
+
+
         return result
 
 if __name__ == "__main__":
