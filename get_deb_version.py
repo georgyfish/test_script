@@ -46,45 +46,6 @@ def get_deb_version(branch,begin_date,end_date):
     return result
 
 
-# driver_dic = {'20240326': ['musa_2024.03.26-D+10129', 'https://oss.mthreads.com/release-ci/repo_tags/20240326.txt', 'https://oss.mthreads.com/product-release/develop/20240326/musa_2024.03.26-D+10129+dkms+glvnd-Ubuntu_amd64.deb', 'musa_2024.03.26-D+10129+dkms+glvnd-Ubuntu_amd64.deb'], '20240327': ['musa_2024.03.27-D+10151', 'https://oss.mthreads.com/release-ci/repo_tags/20240327.txt', 'https://oss.mthreads.com/product-release/develop/20240327/musa_2024.03.27-D+10151+dkms+glvnd-Ubuntu_amd64.deb', 'musa_2024.03.27-D+10151+dkms+glvnd-Ubuntu_amd64.deb']}
-#download driver && install 
-def install_driver(driver_dic,Test_Host_IP,index):
-    result = {}
-    date_list = list(driver_dic.keys())
-    driver_url_list = list(driver_dic.values()) 
-    left = 0
-    right = len(driver_url_list) - 1
-    while True:
-    #for i in range(len(date_list)):
-        swqa_ssh_login_cmd = f"sshpass -p gfx123456 ssh swqa@{Test_Host_IP} -o StrictHostKeyChecking=no"
-        print('=='*10 + f"Download {driver_url_list[index][2]}" + '=='*10)
-        os.system(f"{swqa_ssh_login_cmd} 'cd /home/swqa/ && wget --no-check-certificate -q {driver_url_list[index][2]} -O {driver_url_list[index][-1]}'")
-        print('=='*10 +  f"sudo dpkg -i /home/swqa/{driver_url_list[index][-1]} && sudo reboot" + '=='*10)
-        # os.system(f"{swqa_ssh_login_cmd} 'sudo dpkg -i /home/swqa/{driver_url_list[index][-1]} && sudo reboot'")
-        # time.sleep(150)
-        try:
-            for i in range(3):
-                # time.sleep(10)
-                ping_rs = os.system(f"timeout 5 ping {Test_Host_IP} -c 1")
-                if ping_rs == 0 :
-                    break
-        except:
-            print(f"ping {Test_Host_IP} fail!")
-            exit()
-        # 安装驱动后需手动测试，并输入测试结果：
-        rs = input(f"{driver_url_list[index][-1]}已安装，请执行测试并输入测试结果：")
-        driver_name = driver_url_list[index][0]
-        result[driver_name] = rs
-    # return result
-        # {'musa_2024.03.26-D+10129':'Y'}
-
-    if result[date_list[left]] == result[date_list[right]]:
-        print("此区间内，第一个元素和最后一个元素的结果相等，请确认")
-        return -1
-
-
-
-
 
 if __name__ == '__main__':
     driver_dic = get_deb_version('develop','20240326', '20240327')
