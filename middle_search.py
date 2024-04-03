@@ -29,21 +29,32 @@ def install_deb(driver_list,driver_url_list,Test_Host_IP,index):
         print(f"ping {Test_Host_IP} fail!")
         sys.exit(0)
 
-def install_umd_kmd(repo,driver_list,driver_url_list,Test_Host_IP,index):
+def install_umd_kmd(repo,driver_list,Test_Host_IP,index):
     swqa_ssh_login_cmd = f"sshpass -p gfx123456 ssh swqa@{Test_Host_IP} -o StrictHostKeyChecking=no"
     print('=='*10 + f"Downloading UMD commit {driver_list[index]}" + '=='*10)
     # os.system(f"{swqa_ssh_login_cmd} 'cd /home/swqa/ && wget --no-check-certificate -q {driver_url_list[index]} -O {driver_list[index]}'")
+    repo = repo[-3:]
+    os.system(f"{swqa_ssh_login_cmd} wget http://192.168.114.118/tool/test.sh")
     os.system(f"{swqa_ssh_login_cmd} './test.sh -c {repo} -b develop -i {driver_list[index]}'")
+    if repo == 'kmd':
+        time.sleep(150)
+        try:
+            for i in range(3):
+                # time.sleep(10)
+                ping_rs = os.system(f"timeout 5 ping {Test_Host_IP} -c 1")
+                if ping_rs == 0 :
+                    print(f"ping {Test_Host_IP} pass!")
+                    break
+        except:
+            print(f"ping {Test_Host_IP} fail!")
+            sys.exit(0)
 
-def install_driver(repo,driver_list,driver_url_list,Test_Host_IP,index):
-    # driver_url_list = list(driver_info_dic.values()) 
+def install_driver(repo,driver_list,Test_Host_IP,index):
     # swqa_ssh_login_cmd = f"sshpass -p gfx123456 ssh swqa@{Test_Host_IP} -o StrictHostKeyChecking=no"
     if repo == 'deb':
-        install_deb(driver_list,driver_url_list,Test_Host_IP,index)
-    elif repo == 'gr-umd':
-        install_umd_kmd(repo,driver_list,driver_url_list,Test_Host_IP,index)
-    elif repo == 'gr-kmd':
-        install_umd_kmd(repo,driver_list,driver_url_list,Test_Host_IP,index)
+        install_deb(driver_list,download_url,Test_Host_IP,index)
+    elif repo == 'gr-umd' or repo == 'gr-kmd':
+        install_umd_kmd(repo,driver_list,Test_Host_IP,index)
 
     # 安装驱动后需手动测试，并输入测试结果：
     rs = input(f"{driver_list[index]}已安装，请执行测试并输入测试结果：")
@@ -52,7 +63,7 @@ def install_driver(repo,driver_list,driver_url_list,Test_Host_IP,index):
 
 
 # 二分法查找
-def middle_search(repo,driver_list,download_url):
+def middle_search(repo,driver_list):
     # left、right初始值为列表元素的序号index 最小值和最大值
     left = 0 
     right = len(driver_list) - 1
@@ -61,8 +72,8 @@ def middle_search(repo,driver_list,download_url):
     # dic1用来存储测试结果
     dic1 = {}
     # 按理来说左边的值应该表示不发生，右边的值表示问题发生；引入区间就在相邻的两个值不相等的元素。
-    dic1[driver_list[left]] = install_driver(repo,driver_list,download_url,Test_Host_IP,left)
-    dic1[driver_list[right]] = install_driver(repo,driver_list,download_url,Test_Host_IP,right)
+    dic1[driver_list[left]] = install_driver(repo,driver_list,Test_Host_IP,left)
+    dic1[driver_list[right]] = install_driver(repo,driver_list,Test_Host_IP,right)
     if dic1[driver_list[left]] == dic1[driver_list[right]]:
         print("此区间内，第一个元素和最后一个元素的结果相等，请确认区间范围")
         return -1
@@ -72,7 +83,7 @@ def middle_search(repo,driver_list,download_url):
         middle = (left + right)//2 
         count += 1
         #后续每次只需要去拿到middle 的值
-        dic1[driver_list[middle]] = install_driver(repo,driver_list,download_url,Test_Host_IP,middle)
+        dic1[driver_list[middle]] = install_driver(repo,driver_list,Test_Host_IP,middle)
         if dic1[driver_list[middle]] == dic1[driver_list[left]]:
                 left = middle 
         elif dic1[driver_list[middle]] == dic1[driver_list[right]]:
@@ -101,7 +112,7 @@ if __name__ == "__main__":
 
     driver_list = list(driver_dic.keys())
     download_url = list(driver_dic.values())
-    right = middle_search('deb',driver_list,download_url)
+    right = middle_search('deb',driver_list)
     if right == -1:
         print('此deb区间无法确定到问题引入范围，请往更前找')
         sys.exit(-1)
@@ -129,18 +140,16 @@ if __name__ == "__main__":
         if i == gr_kmd_list[-1]:
             b = kmd_list.index(i)
     kmd_list = kmd_list[a:b+1]
-    kmd_url = []
-    # umd_url="${oss_url}/release-ci/gr-umd/${branch}/${commitID}_${arch}-mtgpu_linux-xorg-release-hw${glvnd}.tar.gz"
-    # kmd_url="${oss_url}/sw-build/gr-kmd/${branch}/${commitID}/${commitID}_${arch}-mtgpu_linux-xorg-release-hw.tar.gz"
-    for i in umd_list: 
-        umd_url.append(f"http://oss.mthreads.com/release-ci/gr-umd/{branch}/{i}_{arch}-mtgpu_linux-xorg-release-hw{glvnd}.tar.gz")
-    for i in umd_list: 
-        umd_url.append(f"http://oss.mthreads.com/release-ci/gr-umd/{branch}/{i}_{arch}-mtgpu_linux-xorg-release-hw{glvnd}.tar.gz")
+    # kmd_url = []
+    # for i in umd_list: 
+    #     umd_url.append(f"http://oss.mthreads.com/release-ci/gr-umd/{branch}/{i}_{arch}-mtgpu_linux-xorg-release-hw{glvnd}.tar.gz")
+    # for i in umd_list: 
+    #     umd_url.append(f"http://oss.mthreads.com/release-ci/gr-umd/{branch}/{i}_{arch}-mtgpu_linux-xorg-release-hw{glvnd}.tar.gz")
     # 最后拿到一个umd_comp列表，一个umd_url列表；
-    umd_right = middle_search('gr-umd',umd_list,umd_url)
+    umd_right = middle_search('gr-umd',umd_list)
     if umd_right == -1:
         print('umd此区间不存在问题引入，相同kmd驱动，仅更换umd驱动，结果相同。后续将测试kmd引入')
-        kmd_right = middle_search('gr-kmd',kmd_list,kmd_url)
+        kmd_right = middle_search('gr-kmd',kmd_list)
         if kmd_right == -1 :
             print('此deb区间确实有问题引入，但更换kmd、umd无法确认引入；')
             sys.exit(-1)

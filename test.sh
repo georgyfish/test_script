@@ -45,6 +45,8 @@ function net_check() {
 
 function download_all() {
     echo download_all
+    # deb_version=$1
+    # deb_url="${oss_url}/product-release/${branch}/${work_date}/${driver_name}"
 }
 
 function download_kmd() {
@@ -261,7 +263,7 @@ function usage() {
     echo "
 -s      # show driver info summary,include KMD/UMD COMMIT INFO;
 -b      # --branch  <develop/release/master/haiguang/kylin>
--c      # component all/kmd/umd ;
+-c      # component deb/kmd/umd ;
 -i      # install commit;
 -h      # --help"
      
@@ -287,7 +289,7 @@ function parse_args() {
                     component='umd'
                 elif [ "$OPTARG" = "all" ]    
                 then
-                    component=all
+                    component='all'
                 else
                     usage
                     exit 1
