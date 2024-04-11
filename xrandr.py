@@ -28,13 +28,6 @@ def get_display_support():
             y = rs.group(3)
             if int(x) >= 1024 and int(y) >= 768:
                 result[device_name][mode] = re.findall("\d+\.\d+", rs.group(4))
-        rs = re.search(r"((\d+)x(\d+))\s+(\d+\.+\d+)\*",line)
-        if rs:
-            mode = rs.group(1)
-            x = rs.group(2)
-            y = rs.group(3)
-            if int(x) >= 1024 and int(y) >= 768:
-                result[device_name][mode] = rs.group(4)
     return result
 
 def get_current_display_mode():
@@ -56,15 +49,7 @@ def get_current_display_mode():
             status = rs.group(2)
             if status == 'connected':
                 result[device_name] = {}
-        # rs = re.search("((\d+)x(\d+))\s+(.*)", line)
-        # if rs:
-        #     mode = rs.group(1)
-        #     print(f"rs.group(1) = {rs.group(1)},rs.group(2) = {rs.group(2)},rs.group(3) = {rs.group(3)},rs.group(4) = {rs.group(4)}")
-        #     x = rs.group(2)
-        #     y = rs.group(3)
-        #     if int(x) >= 1024 and int(y) >= 768:
-        #         result[device_name][mode] = re.findall("\d+\.\d+", rs.group(4))
-        rs = re.search(r"((\d+)x(\d+))\s+(\d+\.+\d+)\*",line)
+        rs = re.search(r"((\d+)x(\d+)).*\s([\d\.]+)\*",line)
         if rs:
             mode = rs.group(1)
             x = rs.group(2)
