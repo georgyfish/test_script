@@ -140,8 +140,15 @@ def run_duplicate_mode(config,times):
     modes = list(config.keys())
     if time == None:
         times = 2
-    # 先把分辨率设置为相同，高分辨率向下适配，再执行--same-as，就不会出现高分辨率显示器画面溢出的现象；
-    rs = subprocess.Popen(f"export DISPLAY=:0.0 && xrandr --output {modes[0]} --same-as {modes[1]} --auto", shell=True)
+    # 先把分辨率设置为相同，高分辨率向下适配，再执行--same-as，就不会出现高分辨率显示器画面溢出的现象；(2 monitors)
+    resolution0 = config[modes[0]].keys()[0]
+    resolution1 = config[modes[1]].keys()[0]
+    if resolution0 == resolution1:
+        rs = subprocess.Popen(f"export DISPLAY=:0.0 && xrandr --output {modes[0]} --same-as {modes[1]} --auto", shell=True) 
+    elif resolution0 > resolution1:
+        rs = subprocess.Popen(f"export DISPLAY=:0.0 && xrandr --output {modes[0]} --mode {resolution1} ; xrandr --output {modes[0]} --same-as {modes[1]} --auto", shell=True)
+    else:
+        rs = subprocess.Popen(f"export DISPLAY=:0.0 && xrandr --output {modes[1]} --mode {resolution0} ; xrandr --output {modes[1]} --same-as {modes[0]} --auto", shell=True)
     time.sleep(10)
     if not check_status:
         return False
@@ -225,5 +232,5 @@ if __name__ == "__main__":
     #run_display_resolution(config, times, random_flag)
     # 修改显示模式
     # run_display_mode(config, times)
-    current = get_current_display_mode()
-    print(current)
+    current_display_config = get_current_display_mode()
+    run_duplicate_mode(current_display_config)
