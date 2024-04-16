@@ -138,26 +138,40 @@ def run_extend_mode(config, times):
 # xrandr复制屏
 def run_duplicate_mode(config,times):
     modes = list(config.keys())
-    if time == None:
-        times = 2
-    # 先把分辨率设置为相同，高分辨率向下适配，再执行--same-as，就不会出现高分辨率显示器画面溢出的现象；(2 monitors)
-    resolution0 = config[modes[0]].keys()[0]
-    resolution1 = config[modes[1]].keys()[0]
-    if resolution0 == resolution1:
-        rs = subprocess.Popen(f"export DISPLAY=:0.0 && xrandr --output {modes[0]} --same-as {modes[1]} --auto", shell=True) 
-    elif resolution0 > resolution1:
-        rs = subprocess.Popen(f"export DISPLAY=:0.0 && xrandr --output {modes[0]} --mode {resolution1} ; xrandr --output {modes[0]} --same-as {modes[1]} --auto", shell=True)
-    else:
-        rs = subprocess.Popen(f"export DISPLAY=:0.0 && xrandr --output {modes[1]} --mode {resolution0} ; xrandr --output {modes[1]} --same-as {modes[0]} --auto", shell=True)
+    resolution = []
+    rate = []
+    for i in range(len(modes)):
+        tmp = config[modes[i]]
+        tmp = list(tmp.keys())
+        resolution.append(tmp[0])
+            # rate[i] = v
+    # 先把分辨率设置为相同，高分辨率向下适配，再执行--same-as，就不会出现高分辨率显示器画面溢出的现象；
+    resolution_sort = list(set(resolution))
+    resolution_sort.sort()
+    cmd = ''
+    for i in range(len(modes)):
+        if resolution[i] == resolution_sort[0]:
+            mode = modes[i]
+    for i in range(len(modes)):
+        if resolution[i] != resolution_sort[0]:
+            cmd += f"xrandr --output {modes[i]} --mode {resolution_sort[0]} --auto &&"
+            cmd += f"xrandr --output {modes[i]} --same-as {mode} --auto && "
+    rs = subprocess.Popen(f"export DISPLAY=:0.0 && {cmd} sleep 1", shell=True)
     time.sleep(10)
     if not check_status:
         return False
 
 # 复制、扩展模式切换
-def run_duplicate_switch_extend_mode():
+def run_duplicate_switch_extend_mode(config,times):
     """
     duplicate_switch_extend
     """
+    modes = list(config.keys())
+    if time == None:
+        times = 2
+    for i in range(times):
+        run_duplicate_mode(config,times)
+        run_extend_mode(config,times)
 
 def run_duplicate_switch_only_mode():
     """
@@ -232,5 +246,9 @@ if __name__ == "__main__":
     #run_display_resolution(config, times, random_flag)
     # 修改显示模式
     # run_display_mode(config, times)
-    current_display_config = get_current_display_mode()
-    run_duplicate_mode(current_display_config)
+    current = get_current_display_mode()
+    modes = list(current.keys())
+    # rs = list(current[modes[0]].keys())
+
+    # print(rs[0])
+    run_duplicate_mode(current,times)
