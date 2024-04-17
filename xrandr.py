@@ -4,7 +4,7 @@ import os
 import re
 import time
 import sys
-import random
+import random,itertools
 
 def get_display_support():
     result = {}
@@ -23,7 +23,6 @@ def get_display_support():
         rs = re.search("((\d+)x(\d+))\s+(.*)", line)
         if rs:
             mode = rs.group(1)
-            print(f"rs.group(1) = {rs.group(1)},rs.group(2) = {rs.group(2)},rs.group(3) = {rs.group(3)},rs.group(4) = {rs.group(4)}")
             x = rs.group(2)
             y = rs.group(3)
             if int(x) >= 1024 and int(y) >= 768:
@@ -106,7 +105,7 @@ def run_display_mode(config, times):
         times = 2
     for i in range(times):
         if i %2 == 0:
-            rs = subprocess.Popen(f"export DISPLAY=:0.0 && xrandr --output {modes[0]} --same-as {modes[1]} --auto", shell=True)
+            rs = subprocess.Popen(f"export DISPLAY=:0.0 && xrandr --output {modes[0]} --same-as {modes[1]}", shell=True)
         else:
             rs = subprocess.Popen(f"export DISPLAY=:0.0 && xrandr --output {modes[0]} --right-of {modes[1]} --auto", shell=True)
         time.sleep(10)
@@ -116,27 +115,39 @@ def run_display_mode(config, times):
 # xrandr左右屏设置，xrandr主屏及左右屏设置
 def run_extend_mode(config, times):
     modes = list(config.keys())
-    if time == None:
+    if times == None:
         times = 2
+    tmp_list = list(itertools.permutations(modes,len(modes)))
     for i in range(times):
-        if i % 2 == 0:
-            rs = subprocess.Popen(f"export DISPLAY=:0.0 && xrandr --output {modes[0]} --right-of {modes[1]} --auto", shell=True)
-        else:
-            rs = subprocess.Popen(f"export DISPLAY=:0.0 && xrandr --output {modes[1]} --right-of {modes[0]} --auto", shell=True)
-        time.sleep(10)
-        if not check_status:
-            return False
+        for tmp in tmp_list:
+            print(tmp)
+            cmd = f"xrandr --output {tmp[0]} --auto "
+            n=1
+            while n < len(tmp):
+                cmd += f"--output {tmp[n]} --right-of {tmp[n-1]} --auto "
+                n += 1
+            print(cmd)
+            rs = subprocess.Popen(cmd,shell=True)
+            time.sleep(10)
+            if not check_status:
+                return False
+            
     for i in range(times):
-        if i % 2 == 0:
-            rs = subprocess.Popen(f"export DISPLAY=:0.0 && xrandr --output {modes[0]} --right-of {modes[1]} --auto --primary", shell=True)
-        else:
-            rs = subprocess.Popen(f"export DISPLAY=:0.0 && xrandr --output {modes[1]} --right-of {modes[0]} --auto --primary", shell=True)
-        time.sleep(10)
-        if not check_status:
-            return False    
+        for tmp in tmp_list:
+            print(tmp)
+            cmd = f"xrandr --output {tmp[0]} --auto --primary "
+            n=1
+            while n < len(tmp):
+                cmd += f"--output {tmp[n]} --right-of {tmp[n-1]} --auto "
+                n += 1
+            print(cmd)
+            rs = subprocess.Popen(cmd,shell=True)
+            time.sleep(10)
+            if not check_status:
+                return False
 
 # xrandr复制屏
-def run_duplicate_mode(config,times):
+def run_duplicate_mode(config):
     modes = list(config.keys())
     resolution = []
     rate = []
@@ -154,9 +165,12 @@ def run_duplicate_mode(config,times):
             mode = modes[i]
     for i in range(len(modes)):
         if resolution[i] != resolution_sort[0]:
-            cmd += f"xrandr --output {modes[i]} --mode {resolution_sort[0]} --auto &&"
-            cmd += f"xrandr --output {modes[i]} --same-as {mode} --auto && "
-    rs = subprocess.Popen(f"export DISPLAY=:0.0 && {cmd} sleep 1", shell=True)
+            cmd += f"&& xrandr --output {modes[i]} --mode {resolution_sort[0]} --auto"
+            cmd += f"&& xrandr --output {modes[i]} --same-as {mode}"
+        elif modes[i] != mode:
+            cmd += f"&& xrandr --output {modes[i]} --same-as {mode}"
+    print(cmd)
+    rs = subprocess.Popen(f"export DISPLAY=:0.0  {cmd} ", shell=True)
     time.sleep(10)
     if not check_status:
         return False
