@@ -6,6 +6,12 @@ import time
 import sys
 import random,itertools
 
+def get_vga_card_info():
+    """
+    get_vga_card_info
+    S80  --- 4个接口
+    """
+
 def get_display_support():
     result = {}
     status = None
@@ -171,9 +177,9 @@ def run_duplicate_mode(config):
     for i in range(len(modes)):
         if resolution[i] != resolution_sort[0]:
             cmd += f"&& xrandr --output {modes[i]} --mode {resolution_sort[0]} --auto "
-            cmd += f"&& xrandr --output {modes[i]} --auto --same-as {mode} "
+            cmd += f"&& xrandr --output {modes[i]}  --same-as {mode} "
         elif modes[i] != mode:
-            cmd += f"&& xrandr --output {modes[i]} --auto --same-as {mode} "
+            cmd += f"&& xrandr --output {modes[i]}  --same-as {mode} "
     print(cmd)
     rs = subprocess.Popen(cmd, shell=True)
     time.sleep(10)
@@ -206,10 +212,10 @@ def run_duplicate_switch_extend_mode(config,times):
                         cmd += f"--output {tmp[n]} --above {tmp[n-1]} --auto "
                 n += 1
             print(cmd)
-            # rs = subprocess.Popen(cmd,shell=True)
-            # time.sleep(10)
-            # if not check_status:
-            #     return False
+            rs = subprocess.Popen(cmd,shell=True)
+            time.sleep(10)
+            if not check_status:
+                return False
 
 
 # 复制独立模式切换
@@ -219,25 +225,27 @@ def run_duplicate_switch_only_mode(config,times):
     """
     print("="*30 + "run_duplicate_switch_only_mode" + "="*30)
     modes = list(config.keys())
-    if time == None:
+    if times == None:
         times = 2
     tmp_list = list(itertools.permutations(modes,len(modes)))
     for i in range(times):
         for tmp in tmp_list:
             run_duplicate_mode(current)
             cmd = "export DISPLAY=:0.0 && "
+            cmd1 = 'export DISPLAY=:0.0 && '
             n = 0
             while n < len(tmp):
                 if n == 0:
                     cmd += f"xrandr --output {tmp[n]} --auto "
                 else:
                     cmd += f"--output {tmp[n]} --off "
+                    cmd1 += f"xrandr --output {tmp[n]} --auto "
                 n += 1
             print(cmd)
-            # rs = subprocess.Popen(cmd,shell=True)
-            # time.sleep(10)
-            # if not check_status:
-            #     return False
+            rs = subprocess.Popen(cmd,shell=True)
+            time.sleep(10)
+            if not check_status:
+                return False
 
 def run_primary_switch(config,times):
     """
@@ -245,11 +253,12 @@ def run_primary_switch(config,times):
     """
     print("="*30 + "monitor_primary_switch" + "="*30)
     modes = list(config.keys())
-    if time == None:
+    if times == None:
         times = 2
     # tmp_list = list(itertools.permutations(modes,len(modes)))
     for mode in modes:
         cmd = f"export DISPLAY=:0.0 && xrandr --output {mode} --auto --primary"
+        print(f"将执行下列命令切换主屏为{mode}:")
         print(cmd)
         rs = subprocess.Popen(cmd,shell=True)
         time.sleep(10)
@@ -305,7 +314,7 @@ def run_extend_switch_only_mode(config,times):
 def run_only_mode(config,times):
     print("="*30 + "run_only_mode" + "="*30)
     modes = list(config.keys())
-    if time == None:
+    if times == None:
         times = 2
     tmp_list = list(itertools.permutations(modes,len(modes)))
     for i in range(times):
@@ -347,10 +356,9 @@ if __name__ == "__main__":
     # config = {'HDMI-1':{'1920x1080':'60.00'},'DP-1':{'2560x1440':'60'},'DP-2':{'2560x1440':'60'}}
     # current = {'HDMI-1':{'1920x1080':'60.00'},'DP-1':{'2560x1440':'60'},'DP-2':{'2560x1440':'60'}}
     run_extend_switch_only_mode(config,times)
-    print("=="*30)
     run_duplicate_switch_extend_mode(config,times)
     run_primary_switch(config,times)
     run_only_mode(config,times)
     run_xrandr_extend_mode(config, times)
     run_duplicate_mode(config)
-    run_duplicate_switch_only_mode(config, times)
+    #run_duplicate_switch_only_mode(config, times)
