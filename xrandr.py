@@ -113,7 +113,8 @@ def run_display_mode(config, times):
             return False
 
 # xrandr左右屏设置，xrandr主屏及左右屏设置
-def run_extend_mode(config, times):
+def run_xrandr_extend_mode(config, times):
+    print("="*30 + "run_xrandr_extend_mode" + "="*30)
     modes = list(config.keys())
     if times == None:
         times = 2
@@ -151,6 +152,7 @@ def run_extend_mode(config, times):
 
 # xrandr复制屏
 def run_duplicate_mode(config):
+    print("="*30 + "run_duplicate_mode" + "="*30)
     modes = list(config.keys())
     resolution = []
     rate = []
@@ -169,20 +171,21 @@ def run_duplicate_mode(config):
     for i in range(len(modes)):
         if resolution[i] != resolution_sort[0]:
             cmd += f"&& xrandr --output {modes[i]} --mode {resolution_sort[0]} --auto "
-            cmd += f"&& xrandr --output {modes[i]} --same-as {mode} "
+            cmd += f"&& xrandr --output {modes[i]} --auto --same-as {mode} "
         elif modes[i] != mode:
-            cmd += f"&& xrandr --output {modes[i]} --same-as {mode} "
+            cmd += f"&& xrandr --output {modes[i]} --auto --same-as {mode} "
     print(cmd)
-    # rs = subprocess.Popen(cmd, shell=True)
-    # time.sleep(10)
-    # if not check_status:
-    #     return False
+    rs = subprocess.Popen(cmd, shell=True)
+    time.sleep(10)
+    if not check_status:
+        return False
 
 # 复制、扩展模式切换
 def run_duplicate_switch_extend_mode(config,times):
     """
     duplicate_switch_extend
     """
+    print("="*30 + "run_duplicate_switch_extend_mode" + "="*30)
     modes = list(config.keys())
     if times == None:
         times = 2
@@ -210,10 +213,11 @@ def run_duplicate_switch_extend_mode(config,times):
 
 
 # 复制独立模式切换
-def run_duplicate_switch_only_mode():
+def run_duplicate_switch_only_mode(config,times):
     """
     duplicate_switch_only
     """
+    print("="*30 + "run_duplicate_switch_only_mode" + "="*30)
     modes = list(config.keys())
     if time == None:
         times = 2
@@ -239,6 +243,7 @@ def run_primary_switch(config,times):
     """
     monitor_primary_switch 主屏切换，不应改变左右屏的方位
     """
+    print("="*30 + "monitor_primary_switch" + "="*30)
     modes = list(config.keys())
     if time == None:
         times = 2
@@ -263,54 +268,42 @@ def run_primary_switch(config,times):
 
 # 扩展独立模式切换
 def run_extend_switch_only_mode(config,times):
+    print("="*30 + "run_extend_switch_only_mode" + "="*30)
     modes = list(config.keys())
     if times == None:
         times = 2
     tmp_list = list(itertools.permutations(modes,len(modes)))
     for i in range(times):
         for tmp in tmp_list:
-            run_duplicate_mode(current)
+            # run_duplicate_mode(current)
             cmd = "export DISPLAY=:0.0 && "
+            cmd1 = "export DISPLAY=:0.0 && "
             n = 0
             while n < len(tmp):
                 if n == 0:
                     cmd += f"xrandr --output {tmp[n]} --auto "
+                    cmd1 += f"xrandr --output {tmp[n]} --auto "
                 else:
                     if i % 2 == 0:
                         cmd += f"--output {tmp[n]} --right-of {tmp[n-1]} --auto "
                     else:
                         cmd += f"--output {tmp[n]} --above {tmp[n-1]} --auto "
-                    cmd += f"&& xrandr --output {tmp[n]} --off "
+                    cmd1 += f"&& xrandr --output {tmp[n]} --off "
                 n += 1
             print(cmd)
-            # rs = subprocess.Popen(cmd,shell=True)
-            # time.sleep(10)
-            # if not check_status:
-            #     return False
-
-
-    # for i in range(times):
-    #     if i % 4 == 0:
-    #         rs = subprocess.Popen(f"export DISPLAY=:0.0 && xrandr --output {modes[0]} --right-of --output {modes[1]} --auto", shell=True)
-    #         time.sleep(10)
-    #         if not check_status:
-    #             return False
-    #         rs = subprocess.Popen(f"export DISPLAY=:0.0 && xrandr --output {modes[0]} --auto --output {modes[1]} --off", shell=True)
-    #         time.sleep(10)
-    #         if not check_status:
-    #             return False
-    #     elif i % 4 == 1:
-    #         rs = subprocess.Popen(f"export DISPLAY=:0.0 && xrandr --output {modes[0]} --left-of --output {modes[1]} --auto", shell=True)
-    #         time.sleep(10)
-    #         if not check_status:
-    #             return False
-    #         rs = subprocess.Popen(f"export DISPLAY=:0.0 && xrandr --output {modes[1]} --auto --output {modes[0]} --off", shell=True)
-    #         time.sleep(10)
-    #         if not check_status:
-    #             return False
+            rs = subprocess.Popen(cmd,shell=True)
+            time.sleep(10)
+            if not check_status:
+                return False
+            print(cmd1)
+            rs = subprocess.Popen(cmd1,shell=True)
+            time.sleep(10)
+            if not check_status:
+                return False
 
 # 独立模式切换
 def run_only_mode(config,times):
+    print("="*30 + "run_only_mode" + "="*30)
     modes = list(config.keys())
     if time == None:
         times = 2
@@ -331,15 +324,6 @@ def run_only_mode(config,times):
             if not check_status:
                 return False
 
-    # for i in range(times):
-    #     if i % 2 == 0:
-    #         rs = subprocess.Popen(f"export DISPLAY=:0.0 && xrandr --output {modes[0]} --auto --output {modes[1]} --off", shell=True)
-    #     else:
-    #         rs = subprocess.Popen(f"export DISPLAY=:0.0 && xrandr --output {modes[1]} --auto --output {modes[0]} --off", shell=True)
-    #     time.sleep(10)
-    #     if not check_status:
-    #         return False
-
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         times = int(sys.argv[1])
@@ -349,19 +333,24 @@ if __name__ == "__main__":
         random_flag = sys.argv[2]
     else:
         random_flag = None
-    # config = get_display_support()
+    config = get_display_support()
     # 修改分辨率
     #run_display_resolution(config, times, random_flag)
     # 修改显示模式
     # run_display_mode(config, times)
-    # current = get_current_display_mode()
+    current = get_current_display_mode()
     # modes = list(current.keys())
     # rs = list(current[modes[0]].keys())
 
     # print(rs[0])
     # run_duplicate_mode(current)
-    config = {'HDMI-1':{'1920x1080':'60.00'},'DP-1':{'2560x1440':'60'},'DP-2':{'2560x1440':'60'}}
-    current = {'HDMI-1':{'1920x1080':'60.00'},'DP-1':{'2560x1440':'60'},'DP-2':{'2560x1440':'60'}}
-    # run_extend_switch_only_mode(config,times)
+    # config = {'HDMI-1':{'1920x1080':'60.00'},'DP-1':{'2560x1440':'60'},'DP-2':{'2560x1440':'60'}}
+    # current = {'HDMI-1':{'1920x1080':'60.00'},'DP-1':{'2560x1440':'60'},'DP-2':{'2560x1440':'60'}}
+    run_extend_switch_only_mode(config,times)
     print("=="*30)
     run_duplicate_switch_extend_mode(config,times)
+    run_primary_switch(config,times)
+    run_only_mode(config,times)
+    run_xrandr_extend_mode(config, times)
+    run_duplicate_mode(config)
+    run_duplicate_switch_only_mode(config, times)
