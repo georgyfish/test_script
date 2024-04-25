@@ -75,6 +75,14 @@ def find_files(directory):
 
     return file_formats
 
+def get_encode_files(directory):
+    file_formats = {} 
+    # 视频文件：编码格式
+    for file in os.path(directory):
+        cmd = f"ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of default=noprint_wrappers=1:nokey=1 {file}"
+        file_code = subprocess.Popen(cmd,shell=True)    
+        file_formats[file] = file_code
+    return file_formats
 
 
 def hard_decode_video(video_file,time):
@@ -98,19 +106,6 @@ def main():
     directory = '/home/swqa/testdata/mm_video/1080P/'  # 替换为你的视频文件夹路径
     file_formats = find_files(directory)
     check_mpv()
-
-    # # 远程服务器的信息
-    # remote_host = '192.168.100.242'
-    # remote_port = 22
-    # remote_user = 'user'
-    # remote_pass = 'gfx123456'
-    # remote_path = '/var/www/data/testdata/'
-
-    # # 本地服务器的信息
-    # local_path = '/home/swqa/'
-    # if not os.path.exists(directory):
-    #     scp_testdata(remote_host, remote_user, remote_pass,remote_path,local_path)
-    
     print("\n找到的文件格式如下：")
     for extension, files in file_formats.items():
         print("扩展名为 %s 的文件:" % extension)

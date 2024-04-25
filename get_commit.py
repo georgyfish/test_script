@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 
 def get_git_commit_info(repo, branch, begin_time, end_time):
     results = []
+    commit_list = []
     data = {
         # http://192.168.114.118/td/code_commit/list
         "repo" : repo,
@@ -21,7 +22,11 @@ def get_git_commit_info(repo, branch, begin_time, end_time):
         for td in tr.select('td'):
             commit[td['name']] = td.get_text()
         results.insert(0, commit)
-    return results
+    for commit in results:
+        commit_list.append(commit['short_id'])    
+    return commit_list
 
 if __name__ == "__main__":
     print(get_git_commit_info("gr-kmd", "develop", "2024-02-29 00:00:00", "2024-03-01 00:00:00"))
+
+

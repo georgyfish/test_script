@@ -58,7 +58,9 @@ def install_driver(repo,driver_list,Test_Host_IP,index):
         install_umd_kmd(repo,driver_list,Test_Host_IP,index)
 
     # 安装驱动后需手动测试，并输入测试结果：
-    rs = input(f"{driver_list[index]}已安装，请执行测试并输入测试结果：(Y/N)")
+    rs = input(f"{driver_list[index]}已安装，请执行测试并输入测试结果，或者输入O过滤这笔commit：(Y/N/O)")
+    if rs == 'O':
+        print(f'过滤{driver_list[index]}这笔commit')
     return rs
 
 

@@ -128,7 +128,7 @@ def run_xrandr_extend_mode(config, times):
     for i in range(times):
         for tmp in tmp_list:
             print(tmp)
-            cmd = f"xrandr --output {tmp[0]} --auto "
+            cmd = f"export DISPLAY=:0.0 && xrandr --output {tmp[0]} --auto "
             n=1
             while n < len(tmp):
                 cmd += f"--output {tmp[n]} --right-of {tmp[n-1]} --auto "
@@ -142,13 +142,10 @@ def run_xrandr_extend_mode(config, times):
     for i in range(times):
         for tmp in tmp_list:
             print(tmp)
-            cmd = "export DISPLAY=:0.0 && "
-            n=0
+            cmd = f"export DISPLAY=:0.0 && xrandr --output {tmp[0]} --auto --primary "
+            n=1
             while n < len(tmp):
-                if n == 0:
-                    cmd += f"xrandr --output {tmp[n]} --auto --primary "
-                else:
-                    cmd += f"--output {tmp[n]} --right-of {tmp[n-1]} --auto "
+                cmd += f"--output {tmp[n]} --right-of {tmp[n-1]} --auto "
                 n += 1
             print(cmd)
             rs = subprocess.Popen(cmd,shell=True)
@@ -164,16 +161,18 @@ def run_duplicate_mode(config):
     rate = []
     for i in range(len(modes)):
         tmp = config[modes[i]]
-        tmp = list(tmp.keys())
-        resolution.append(tmp[0])
+        if bool(tmp):
+            tmp = list(tmp.keys())
+            resolution.append(tmp[0])
             # rate[i] = v
     # 先把分辨率设置为相同，高分辨率向下适配，再执行--same-as，就不会出现高分辨率显示器画面溢出的现象；
     resolution_sort = list(set(resolution))
     resolution_sort.sort()
-    cmd = 'export DISPLAY=:0.0 '
+    
     for i in range(len(modes)):
         if resolution[i] == resolution_sort[0]:
             mode = modes[i]
+    cmd = 'export DISPLAY=:0.0 && xrandr --output {mode} --auto '
     for i in range(len(modes)):
         if resolution[i] != resolution_sort[0]:
             cmd += f"&& xrandr --output {modes[i]} --mode {resolution_sort[0]} --auto "
@@ -225,6 +224,14 @@ def run_duplicate_switch_only_mode(config,times):
     """
     print("="*30 + "run_duplicate_switch_only_mode" + "="*30)
     modes = list(config.keys())
+    str  = "export DISPLAY=:0.0 && "
+    for mode in modes:
+        str += f"xrandr --output {mode} "
+    rs = subprocess.Popen(str,shell=True)
+    time.sleep(10)
+    if not check_status:
+        return False
+    
     if times == None:
         times = 2
     tmp_list = list(itertools.permutations(modes,len(modes)))
@@ -360,5 +367,5 @@ if __name__ == "__main__":
     run_primary_switch(config,times)
     run_only_mode(config,times)
     run_xrandr_extend_mode(config, times)
-    run_duplicate_mode(config)
+    run_duplicate_mode(current)
     #run_duplicate_switch_only_mode(config, times)

@@ -11,6 +11,10 @@ import subprocess
 4. 定位UMD commit引入，
 5. UMD定位不到，执行KMD定位；
 
+定位umd_commit:
+1. get_commit   commit_begin  commit_end
+2. middle_search()----> 区间
+
 """
 
 
