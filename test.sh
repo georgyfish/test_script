@@ -244,6 +244,7 @@ function show_umd_info() {
 #    echo "shwo umd info "
     FenGeLine "UMD INFO"
     umd_commit=$(export DISPLAY=:0.0 && glxinfo -B |grep -i "OpenGL version string"|awk '{print $NF}'|awk -F "@" '{print $1}')
+    # umd_commit=$(clinfo |grep "Driver Version"|awk -F' '  '{print $6}'|awk -F'@' '{print $1}')
     if [[ $umd_commit != "" ]]
     then
         echo "[INFO] UMD commitID : $umd_commit"
@@ -372,9 +373,9 @@ if [ $arch = 'aarch64' ];then
 fi
 glvnd="-glvnd"
 # os是Kylin就使用非glvnd的umd；
-if [ $os_type = "Kylin" ];then 
-    glvnd=''
-fi
+# if [ $os_type = "Kylin" ];then 
+#     glvnd=''
+# fi
  
 main "$@"
 

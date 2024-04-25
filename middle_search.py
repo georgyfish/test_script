@@ -4,6 +4,7 @@ import os,sys,time
 from get_deb_version import get_deb_version
 import subprocess
 import get_commit
+import umd_fallback
 
 
 
@@ -34,8 +35,8 @@ def install_umd_kmd(repo,driver_list,Test_Host_IP,index):
     print('=='*10 + f"Downloading UMD commit {driver_list[index]}" + '=='*10)
     # os.system(f"{swqa_ssh_login_cmd} 'cd /home/swqa/ && wget --no-check-certificate -q {driver_url_list[index]} -O {driver_list[index]}'")
     repo = repo[-3:]
-    os.system(f"{swqa_ssh_login_cmd} wget http://192.168.114.118/tool/test.sh")
-    os.system(f"{swqa_ssh_login_cmd} './test.sh -c {repo} -b develop -i {driver_list[index]}'")
+    # os.system(f"{swqa_ssh_login_cmd} wget http://192.168.114.118/tool/test.sh")
+    os.system(f"{swqa_ssh_login_cmd} 'cd yq/ && ./test.sh -c {repo} -b develop -i {driver_list[index]}'")
     if repo == 'kmd':
         time.sleep(150)
         try:
@@ -57,7 +58,7 @@ def install_driver(repo,driver_list,Test_Host_IP,index):
         install_umd_kmd(repo,driver_list,Test_Host_IP,index)
 
     # 安装驱动后需手动测试，并输入测试结果：
-    rs = input(f"{driver_list[index]}已安装，请执行测试并输入测试结果：")
+    rs = input(f"{driver_list[index]}已安装，请执行测试并输入测试结果：(Y/N)")
     return rs
 
 
@@ -71,7 +72,8 @@ def middle_search(repo,driver_list):
     result = []
     # dic1用来存储测试结果
     dic1 = {}
-    # 按理来说左边的值应该表示不发生，右边的值表示问题发生；引入区间就在相邻的两个值不相等的元素。
+    # 正常来说左边的值应该表示不发生，右边的值表示问题发生；引入区间就在相邻的两个值不相等的元素。
+    Test_Host_IP = umd_fallback.Test_Host_IP
     dic1[driver_list[left]] = install_driver(repo,driver_list,Test_Host_IP,left)
     dic1[driver_list[right]] = install_driver(repo,driver_list,Test_Host_IP,right)
     if dic1[driver_list[left]] == dic1[driver_list[right]]:
@@ -88,12 +90,12 @@ def middle_search(repo,driver_list):
                 left = middle 
         elif dic1[driver_list[middle]] == dic1[driver_list[right]]:
                 right = middle 
-    else:
         # print(f"count={count}")
-        print(f"使用二分法{count}次确认，定位到问题引入范围是 {driver_list[left]}(不发生)-{driver_list[right]}(发生)之间引入")     
+    print(f"使用二分法{count}次确认，定位到问题引入范围是 {driver_list[left]}(不发生)-{driver_list[right]}(发生)之间引入")     
         # print(f"对应的deb的repo_tag为{driver_repo_tag[left]},{driver_repo_tag[right]}")
         # result = {driver_list[left]:driver_repo_tag[left],driver_list[right]:driver_repo_tag[left]}
-    return right
+    # return right
+    return driver_list[left:right]
 
 if __name__ == "__main__":
     Test_Host_IP = "192.168.114.26"
@@ -133,7 +135,6 @@ if __name__ == "__main__":
         if i == gr_umd_list[-1]:
             b = umd_list.index(i)
     umd_list = umd_list[a:b+1]
-    umd_url = []
     for i in kmd_list:
         if i == gr_kmd_list[0]:
             a = kmd_list.index(i)
