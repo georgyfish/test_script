@@ -19,7 +19,7 @@ if __name__ == "__main__":
     
     repo = 'gr-umd'
     branch = 'develop'
-    begin_time = "2024-04-23 00:00:00"
+    begin_time = "2024-04-22 00:00:00"
     end_time = "2024-04-24 00:00:00"
     umd_list = get_commit.get_git_commit_info(repo, branch, begin_time, end_time)
     if len(sys.argv) != 1 and len(sys.argv) != 2:
@@ -33,4 +33,4 @@ if __name__ == "__main__":
                 b = umd_list.index(i)
         umd_list = umd_list[a:b+1]
     print(umd_list)
-    umd_fallback(repo,umd_list)
+    # umd_fallback(repo,umd_list)

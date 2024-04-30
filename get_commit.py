@@ -23,7 +23,12 @@ def get_git_commit_info(repo, branch, begin_time, end_time):
             commit[td['name']] = td.get_text()
         results.insert(0, commit)
     for commit in results:
-        commit_list.append(commit['short_id'])    
+        # commit_list.append(commit['short_id'])    
+        commit_id = commit['short_id']
+        # oss_url="https://oss.mthreads.com"
+        # if repo == 'gr-umd':
+        #     umd_url=f"{oss_url}/release-ci/gr-umd/{branch}/{commit_id}_{arch}-mtgpu_linux-xorg-release-hw{glvnd}.tar.gz"
+        commit_list.append(commit['short_id']) 
     return commit_list
 
 if __name__ == "__main__":
