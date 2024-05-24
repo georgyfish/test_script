@@ -5,7 +5,7 @@ function check_para() {
     if [[ $# == 0 ]];then 
         check_current
     fi
-    if (( $# -lt 1 ));then 
+    if [[ $# > 1 ]];then 
         echo "请使用合法参数:$0 card0/card1"
         exit 1
     fi
@@ -13,19 +13,23 @@ function check_para() {
     typeset -u name
     name=$primary_gpu
     if [[ ${name:0:4} != "CARD" ]];then
-        echo "切换PrimaryGPU测试请使用合法参数:$0 card0/card1"
+        echo "切换PrimaryGPU请使用合法参数:$0 card0/card1"
         # echo $name
         exit 1
     fi
     if [[ ${primary_gpu:(-1)} =~ ^[0-9]+$ ]];then
         primary_gpu="card${primary_gpu:(-1)}"
     else
-        echo "切换PrimaryGPU测试请使用合法参数:$0 card0/card1"
+        echo "切换PrimaryGPU请使用合法参数:$0 card0/card1"
         exit 1
     fi
     # 边界值，card0-n应当小于显卡数量;显卡数量应大于等于2；
+    if (( $card_cnt < 2));then
+        echo "识别显卡数量大于1才可切换"
+        exit 1
+    fi
     cardID=`echo $primary_gpu |awk -F 'card' '{print $2}'`
-    if [[ $cardID -gt $(expr $card_cnt - 1) ]] || (( $card_cnt < 2)) ;then 
+    if [[ $cardID -gt $(expr $card_cnt - 1) ]] ;then 
         echo "GPU序号错误"
         exit 1
     fi
@@ -48,7 +52,7 @@ function xorg_config() {
         c=$((16#$(echo $pcie_addr|awk -F':' '{print $2}'|awk -F'.' '{print $2}')))
         mt_bus_id="$mt_bus_id:$b:$c"
         #echo $mt_bus_id
-        device_id=$(find /sys/devices -name drm|grep $pcie_addr|xargs -n1 ls|grep card|grep -oE '[0-9]+')
+        device_id=$(find /sys/devices/ -name drm|grep $pcie_addr|xargs -n1 ls|grep card|grep -oE '[0-9]+')
         echo "card$device_id : $(lspci |grep $pcie_addr)"
         driver=$(lspci -k |grep $pcie_addr -A3|grep "driver in use" |awk -F ": " '{print $2}')
         mtgpu_config_base=''
@@ -126,9 +130,12 @@ function check_primarygpu() {
 function check_current() {
     current_PrimaryGPU=`grep "(0): using drv /dev/dri/card" /var/log/Xorg.0.log |awk  -F"/dev/dri/" '{print $2}'`
     secondaryGPU=`grep "(G0): using drv /dev/dri/card" /var/log/Xorg.0.log |awk  -F"/dev/dri/" '{print $2}'`
-    vga_info=$(lspci |grep $(find  /sys/devices -name $current_PrimaryGPU |grep drm |awk -F"/" '{print $(NF-2)}'|awk -F: '{print $2":"$3}'))
-    echo "当前环境PrimaryGPU是$current_PrimaryGPU : $vga_info"
-    echo "当前环境SecondaryGPU是$secondaryGPU : $(lspci |grep $(find  /sys/devices -name $secondaryGPU |grep drm |awk -F"/" '{print $(NF-2)}'|awk -F: '{print $2":"$3}'))"
+    current_PrimaryGPU_busID=$(find  /sys/devices/ -name $current_PrimaryGPU |grep drm |awk -F"/" '{print $(NF-2)}'|awk -F: '{print $2":"$3}')
+    current_PrimaryGPU_info=$(lspci |grep $current_PrimaryGPU_busID)
+    secondaryGPU_busID=$(find  /sys/devices -name $secondaryGPU |grep drm |awk -F"/" '{print $(NF-2)}'|awk -F: '{print $2":"$3}')
+    secondaryGPU_info=$(lspci |grep $secondaryGPU_busID)
+    echo "当前PrimaryGPU是 $current_PrimaryGPU : $current_PrimaryGPU_info"
+    echo "当前SecondaryGPU是 $secondaryGPU : $secondaryGPU_info"
 }
 
 primary_gpu=$1
