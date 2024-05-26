@@ -128,8 +128,8 @@ function check_primarygpu() {
 
 }
 function check_current() {
-    current_PrimaryGPU=`grep "(0): using drv /dev/dri/card" /var/log/Xorg.0.log |awk  -F"/dev/dri/" '{print $2}'`
-    secondaryGPU=`grep "(G0): using drv /dev/dri/card" /var/log/Xorg.0.log |awk  -F"/dev/dri/" '{print $2}'`
+    current_PrimaryGPU=`grep "(0): using drv /dev/dri/card" $Xorg_log_path |awk  -F"/dev/dri/" '{print $2}'`
+    secondaryGPU=`grep "(G0): using drv /dev/dri/card" $Xorg_log_path |awk  -F"/dev/dri/" '{print $2}'`
     current_PrimaryGPU_busID=$(find  /sys/devices/ -name $current_PrimaryGPU |grep drm |awk -F"/" '{print $(NF-2)}'|awk -F: '{print $2":"$3}')
     current_PrimaryGPU_info=$(lspci |grep $current_PrimaryGPU_busID)
     secondaryGPU_busID=$(find  /sys/devices -name $secondaryGPU |grep drm |awk -F"/" '{print $(NF-2)}'|awk -F: '{print $2":"$3}')
@@ -138,16 +138,27 @@ function check_current() {
     echo "当前SecondaryGPU是 $secondaryGPU : $secondaryGPU_info"
 }
 
+dm=$(cat /etc/X11/default-display-manager |awk -F/ '{print $NF}') 
+#检查dm为lightdm还是gdm，如果是lightdm，Xorg的日志地址是"/var/log/Xorg.0.log",\
+#如果是gdm3,Xorg的日志地址是"~/.local/share/xog/Xorg.0.log"
+if [ $dm = 'lightdm' ];then
+    Xorg_log_path="/var/log/Xorg.0.log";
+elif [ $dm = 'gdm3' ];then
+    Xorg_log_path="$HOME/.local/share/xorg/Xorg.0.log";
+else
+    echo "check dm"
+fi
+
+echo "Xorg_log_path=$Xorg_log_path"
 primary_gpu=$1
 card_cnt=$(lspci |grep -Ei "VGA compatible controller|3D controller|1ed5|MTT"|grep -v audio|grep -v NVMe|awk '{print $1}'|wc -l)
 check_para $primary_gpu
-
 xorg_config
 # sudo systemctl stop lightdm
 # sudo ps -ef |grep Xorg|awk '{print $2}'|xargs -n1 kill -9
 sudo cp ~/xorg.conf /etc/X11
 echo "sudo cp ~/xorg.conf /etc/X11"
-echo "sudo systemctl restart lightdm "
-sudo systemctl restart lightdm 
+echo "sudo systemctl restart $dm "
+sudo systemctl restart $dm 
 sleep 5
 check_primarygpu
