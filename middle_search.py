@@ -63,41 +63,66 @@ def install_driver(repo,driver_list,Test_Host_IP,index):
         print(f'过滤{driver_list[index]}这笔commit')
     return rs
 
-
-
-# 二分法查找
-def middle_search(repo,driver_list):
+# 二分查找，需要一个有序的数据类型，
+def middle_search(repo,test_list):
     # left、right初始值为列表元素的序号index 最小值和最大值
     left = 0 
     right = len(driver_list) - 1
     count = 0
     result = []
-    # dic1用来存储测试结果
+    # test_list[0]的value用来存储测试结果，再对vaule的结果进行比对
     dic1 = {}
     # 正常来说左边的值应该表示不发生，右边的值表示问题发生；引入区间就在相邻的两个值不相等的元素。
     Test_Host_IP = umd_fallback.Test_Host_IP
-    dic1[driver_list[left]] = install_driver(repo,driver_list,Test_Host_IP,left)
-    dic1[driver_list[right]] = install_driver(repo,driver_list,Test_Host_IP,right)
-    if dic1[driver_list[left]] == dic1[driver_list[right]]:
+    test_list[left][list(test_list[left].keys())[0]] = install_driver(repo,driver_list,Test_Host_IP,left)
+    # test_list[list(test_list[left].keys())[0]] = install_driver(repo,driver_list,Test_Host_IP,left)
+    test_list[right][list(test_list[right].keys())[0]] = install_driver(repo,driver_list,Test_Host_IP,right)
+    if test_list[left][list(test_list[left].keys())[0]] == test_list[right][list(test_list[right].keys())[0]]:
         print("此区间内，第一个元素和最后一个元素的结果相等，请确认区间范围")
-        return -1
-    # 当left + 1 =right时，即driver_list[left]、driver_list[right]为相邻元素时，结束循环，right即为引入
-    while left <= right -2:
-        #中间值为 left+right的和除2，取商
-        middle = (left + right)//2 
-        count += 1
-        #后续每次只需要去拿到middle 的值
-        dic1[driver_list[middle]] = install_driver(repo,driver_list,Test_Host_IP,middle)
-        if dic1[driver_list[middle]] == dic1[driver_list[left]]:
-                left = middle 
-        elif dic1[driver_list[middle]] == dic1[driver_list[right]]:
-                right = middle 
-        # print(f"count={count}")
-    print(f"使用二分法{count}次确认，定位到问题引入范围是 {driver_list[left]}(不发生)-{driver_list[right]}(发生)之间引入")     
-        # print(f"对应的deb的repo_tag为{driver_repo_tag[left]},{driver_repo_tag[right]}")
-        # result = {driver_list[left]:driver_repo_tag[left],driver_list[right]:driver_repo_tag[left]}
-    # return right
-    return driver_list[left:right]
+        return None               
+    while left <= right -2 :
+        middle = (left + right )//2 
+        count += 1 
+        test_list[middle][list(test_list[middle].keys())[0]] = install_driver(repo,driver_list,Test_Host_IP,middle)
+        if test_list[middle][list(test_list[middle].keys())[0]] != None and test_list[middle][list(test_list[middle].keys())[0]] == test_list[left][list(test_list[left].keys())[0]]:
+            left = middle 
+        elif test_list[middle][list(test_list[middle].keys())[0]] != None and test_list[middle][list(test_list[middle].keys())[0]] == test_list[right][list(test_list[right].keys())[0]]:
+            right = middle 
+    print(f"使用二分法{count}次确认，定位到问题引入范围是 {test_list[left][list(test_list[left].keys())[0]]}(不发生)-{test_list[right][list(test_list[right].keys())[0]]}(发生)之间引入") 
+    # return test_list[left:right]
+    return [test_list[left][list(test_list[left].keys())[0]],test_list[right][list(test_list[right].keys())[0]]]
+# def middle_search(repo,driver_list):
+#     # left、right初始值为列表元素的序号index 最小值和最大值
+#     left = 0 
+#     right = len(driver_list) - 1
+#     count = 0
+#     result = []
+#     # dic1用来存储测试结果
+#     dic1 = {}
+#     # 正常来说左边的值应该表示不发生，右边的值表示问题发生；引入区间就在相邻的两个值不相等的元素。
+#     Test_Host_IP = umd_fallback.Test_Host_IP
+#     dic1[driver_list[left]] = install_driver(repo,driver_list,Test_Host_IP,left)
+#     dic1[driver_list[right]] = install_driver(repo,driver_list,Test_Host_IP,right)
+#     if dic1[driver_list[left]] == dic1[driver_list[right]]:
+#         print("此区间内，第一个元素和最后一个元素的结果相等，请确认区间范围")
+#         return -1
+#     # 当left + 1 =right时，即driver_list[left]、driver_list[right]为相邻元素时，结束循环，right即为引入
+#     while left <= right -2:
+#         #中间值为 left+right的和除2，取商
+#         middle = (left + right)//2 
+#         count += 1
+#         #后续每次只需要去拿到middle 的值
+#         dic1[driver_list[middle]] = install_driver(repo,driver_list,Test_Host_IP,middle)
+#         if dic1[driver_list[middle]] == dic1[driver_list[left]]:
+#                 left = middle 
+#         elif dic1[driver_list[middle]] == dic1[driver_list[right]]:
+#                 right = middle 
+#         # print(f"count={count}")
+#     print(f"使用二分法{count}次确认，定位到问题引入范围是 {driver_list[left]}(不发生)-{driver_list[right]}(发生)之间引入")     
+#         # print(f"对应的deb的repo_tag为{driver_repo_tag[left]},{driver_repo_tag[right]}")
+#         # result = {driver_list[left]:driver_repo_tag[left],driver_list[right]:driver_repo_tag[left]}
+#     # return right
+#     return driver_list[left:right]
 
 if __name__ == "__main__":
     Test_Host_IP = "192.168.114.26"
@@ -160,3 +185,49 @@ if __name__ == "__main__":
             print(f'问题引入为{kmd_list[right]}')
     else:
         print(f'问题引入为{umd_list[right]}')
+
+
+
+
+    driver_full_list = get_deb_version(branch,'20240325', '20240327') 
+    driver_list = []
+    # driver_tag_list = []
+    for driver in driver_full_list:
+        driver_version = driver[0]
+        driver_tag = driver[1]
+        driver_list.append({driver_version:None})
+    print(driver_list)
+    # [{'musa_2024.03.25-D+10109': None}, {'musa_2024.03.26-D+10129': None}, {'musa_2024.03.27-D+10151': None}]
+    deb_rs_list = middle_search('deb',driver_list)
+    if deb_rs_list == None:
+        print("此deb区间无法确定到问题引入范围")
+        sys.exit(-1)
+
+    gr_umd_start_end = []
+    gr_kmd_start_end = []
+    for deb in deb_rs_list:
+        index_of_deb = driver_full_list.index(deb)
+        repo_tag_url = driver_full_list[index_of_deb][1]
+        rs = subprocess.Popen(f"curl {repo_tag_url}", shell=True, close_fds=True, stdin = subprocess.PIPE, stdout = subprocess.PIPE, stderr = subprocess.PIPE).communicate()
+        repo_tag_dict = eval(rs[0].decode())
+        # {'mthreads-gmi': {'develop': '775306fcc', 'master': 'b55a66c9d'}, 'mt-media-driver': {'develop': '2a48bb594'}, 'mt-pes': {'master': 'ff3b990ba'}, 'gr-kmd': {'develop': 'cfb671a2d',\
+        #  'release-2.5.0-OEM': '6e65e6285'}, 'graphics-compiler': {'master': '6bfb47527'}, 'm3d': {'master': 'fad16f82a'}, 'vbios': {'master': '79c044773'}, 'ogl': {'master': '757a3724b'}, \
+        # 'd3dtests': {'master': 'a88614bcc'}, 'gr-umd': {'develop': 'da0c850b8', 'release-2.5.0-OEM': '3d2e327ca'}, 'wddm': {'develop': '11ba5447c'}}
+        gr_umd_start_end.append(repo_tag_dict['gr-umd'][branch])
+        gr_kmd_start_end.append(repo_tag_dict['gr-kmd'][branch])
+    print(gr_umd_start_end,gr_kmd_start_end)
+    umd_list = get_commit.get_git_commit_info("gr-umd", "develop", "2024-02-29 00:00:00", "2024-03-01 00:00:00")
+    kmd_list = get_commit.get_git_commit_info("gr-kmd", "develop", "2024-02-29 00:00:00", "2024-03-01 00:00:00")
+    index_start, index_end= 0,0
+    for i in umd_list:
+        if i == gr_umd_list[0]:
+            index_start = umd_list.index(i)
+        if i == gr_umd_list[-1]:
+            index_end = umd_list.index(i)
+    umd_list = umd_list[index_start:index_end+1]
+    for i in kmd_list:
+        if i == gr_kmd_list[0]:
+            index_start = kmd_list.index(i)
+        if i == gr_kmd_list[-1]:
+            index_end = kmd_list.index(i)
+    kmd_list = kmd_list[index_start:index_end+1]

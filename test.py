@@ -2,14 +2,42 @@
 from datetime import datetime, timezone, timedelta
 import middle_search
 from get_deb_version import get_deb_version
-import subprocess
+import subprocess,os,sys
 """
-1. 根据时间区间拿到deb大致区间，
+确定发生一个回退问题----》大致版本区间---》根据
+1. 根据时间区间拿到deb大致区间   给定一个时间区间参数，分支参数；
+    test.py develop 20240501(不发生) 2023040520(发生)
+    根据时间参数--找到中间的工作日期  
+    根据工作日期对应的daily_deb   
+        curl --insecure https://oss.mthreads.com/product-release/develop/20240527/daily_build.txt
+        f"curl --insecure https://oss.mthreads.com/product-release/{branch}/{daily_tag}/daily_build.txt"
+        result = get_deb_version.get_deb_version(branch,begin_date,end_date)
+        [['musa_2024.03.26-D+10129', 'https://oss.mthreads.com/release-ci/repo_tags/20240326.txt'],
+          ['musa_2024.03.27-D+10151', 'https://oss.mthreads.com/release-ci/repo_tags/20240327.txt']]
+
 2. 二分法定位:  执行deb -----> 拿到测试结果------->写入字典--->判断   ------> 继续执行deb安装-----> 拿到测试结果------->写入字典------>
-判断   结束  -- 得到deb引入区间；
-3. 根据deb 区间，定位到UMD、KMD commit区间；
-4. 定位UMD commit引入，
-5. UMD定位不到，执行KMD定位；
+判断   结束  -- 得到deb引入区间
+    二分查找法，根据嵌套列表的index次序 
+        每次去安装查找的那个包 得到结果 写入result 列表
+        middle_search 返回一个列表[left.right], left为不发生的index , right为发生的index
+    远程控制， 安装驱动deb 
+    install_deb()
+
+3. 根据deb 区间  定位到UMD、KMD commit区间 
+    result[left][1] = 'https://oss.mthreads.com/release-ci/repo_tags/20240326.txt'
+    result[left][2] = 'https://oss.mthreads.com/release-ci/repo_tags/20240327.txt'
+    curl 'https://oss.mthreads.com/release-ci/repo_tags/20240326.txt'  ---》 {"mthreads-gmi":{"develop":"15d1e9380","master":"8ee556f92"},"mt-pes":{"master":"7202a31dc"},"mt-management":\
+        {"develop":"dad852321","master":"6c374091d"},"mt-media-driver":{"develop":"7e4ecb1cc"},"DirectStream":{"develop":"208e5240d"},"gr-kmd":{"develop":"69d7e3104",\
+            "release-2.5.0-OEM":"8c51763a1"},"graphics-compiler":{"master":"545ffa3a9"},"m3d":{"master":"a9567d601"},"mtdxum":{"master":"9cac086dd"},"d3dtests":{"master":"bd0358ed2"},\
+                "ogl":{"master":"44be1b68a"},"gr-umd":{"develop":"6dd19a265","release-2.5.0-OEM":"27a85ebf5"},"wddm":{"develop":"d23c6060d"}}
+    字典嵌套字典  
+        dict['gr-umd']["develop"]  ---> UMD commitID
+
+
+4. 定位UMD commit引入
+    获取UMD commitID 列表
+
+5. UMD定位不到  执行KMD定位
 
 定位umd_commit:
 1. get_commit   commit_begin  commit_end
@@ -46,4 +74,41 @@ umd_list = get_commit("gr-umd","develop",contribute_deb)
 middle_search.middle_check(umd_list)
 
 if __name__ == "__main__":
-    pass
+    driver_full_list = get_deb_version(branch,'20240325', '20240327') 
+    driver_list = []
+    # driver_tag_list = []
+    for driver in driver_full_list:
+        driver_version = driver[0]
+        driver_tag = driver[1]
+        driver_list.append({driver_version:None})
+    print(driver_list)
+    # [{'musa_2024.03.25-D+10109': None}, {'musa_2024.03.26-D+10129': None}, {'musa_2024.03.27-D+10151': None}]
+    deb_rs_list = middle_search('deb',driver_list)
+    if deb_rs_list == None:
+        print("此deb区间无法确定到问题引入范围")
+        sys.exit(-1)
+
+    gr_umd_start_end = []
+    gr_kmd_start_end = []
+    for deb in deb_rs_list:
+        index_of_deb = driver_full_list.index(deb)
+        repo_tag_url = driver_full_list[index_of_deb][1]
+        rs = subprocess.Popen(f"curl {repo_tag_url}", shell=True, close_fds=True, stdin = subprocess.PIPE, stdout = subprocess.PIPE, stderr = subprocess.PIPE).communicate()
+        repo_tag_dict = eval(rs[0].decode())
+        # {'mthreads-gmi': {'develop': '775306fcc', 'master': 'b55a66c9d'}, 'mt-media-driver': {'develop': '2a48bb594'}, 'mt-pes': {'master': 'ff3b990ba'}, 'gr-kmd': {'develop': 'cfb671a2d',\
+        #  'release-2.5.0-OEM': '6e65e6285'}, 'graphics-compiler': {'master': '6bfb47527'}, 'm3d': {'master': 'fad16f82a'}, 'vbios': {'master': '79c044773'}, 'ogl': {'master': '757a3724b'}, \
+        # 'd3dtests': {'master': 'a88614bcc'}, 'gr-umd': {'develop': 'da0c850b8', 'release-2.5.0-OEM': '3d2e327ca'}, 'wddm': {'develop': '11ba5447c'}}
+        gr_umd_start_end.append(repo_tag_dict['gr-umd'][branch])
+        gr_kmd_start_end.append(repo_tag_dict['gr-kmd'][branch])
+    print(gr_umd_start_end,gr_kmd_start_end)
+    umd_list = get_commit.get_git_commit_info("gr-umd", "develop", "2024-02-29 00:00:00", "2024-03-01 00:00:00")
+    kmd_list = get_commit.get_git_commit_info("gr-kmd", "develop", "2024-02-29 00:00:00", "2024-03-01 00:00:00")
+    index_start, index_end= 0,0
+    umd_rs_list = []
+    kmd_rs_list = []
+    for umd in umd_list:
+        if umd_list.index(umd) >= umd_list.index(gr_umd_start_end[0]) and umd_list.index(umd) <= umd_list.index(gr_umd_start_end[1]):
+            umd_rs_list.append({umd:None})
+    for kmd in kmd_list:
+        if kmd_list.index(kmd) >= kmd_list.index(gr_kmd_start_end[0]) and kmd_list.index(kmd) <= kmd_list.index(gr_kmd_start_end[1]):
+            kmd_rs_list.append({umd:None})
