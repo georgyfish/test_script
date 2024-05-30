@@ -1,23 +1,27 @@
 #!/usr/bin/python3
 # import get_commit
-import os,sys,time
+import os,sys,time,re
 from get_deb_version import get_deb_version
 import subprocess
 import get_commit
 import umd_fallback
-
+from datetime import datetime
 
 
 # driver_dic = {'20240326': ['musa_2024.03.26-D+10129', 'https://oss.mthreads.com/release-ci/repo_tags/20240326.txt', 'https://oss.mthreads.com/product-release/develop/20240326/musa_2024.03.26-D+10129+dkms+glvnd-Ubuntu_amd64.deb', 'musa_2024.03.26-D+10129+dkms+glvnd-Ubuntu_amd64.deb'], '20240327': ['musa_2024.03.27-D+10151', 'https://oss.mthreads.com/release-ci/repo_tags/20240327.txt', 'https://oss.mthreads.com/product-release/develop/20240327/musa_2024.03.27-D+10151+dkms+glvnd-Ubuntu_amd64.deb', 'musa_2024.03.27-D+10151+dkms+glvnd-Ubuntu_amd64.deb']}
 # lis1 = ["commit0","commit1","commit2","commit3","commit4","commit5","commit6","commit7","commit8","commit9","commit10","commit11","commit12"]
 # dic1 = {"commit0":"true","commit1":"true","commit2":"true","commit3":"true","commit4":"true","commit5":"true","commit6":"true","commit7":"true","commit8":"true","commit9":"true","commit10":"true","commit11":"true","commit12":"true"}fd
 
-def install_deb(driver_list,driver_url_list,Test_Host_IP,index):
+def install_deb(driver_version,Test_Host_IP):
     swqa_ssh_login_cmd = f"sshpass -p gfx123456 ssh swqa@{Test_Host_IP} -o StrictHostKeyChecking=no"
-    print('=='*10 + f"Downloading {driver_list[index]}" + '=='*10)
-    os.system(f"{swqa_ssh_login_cmd} 'cd /home/swqa/ && wget --no-check-certificate -q {driver_url_list[index]} -O {driver_list[index]}'")
-    print('=='*10 +  f"sudo dpkg -i {driver_list[index]} && sudo reboot" + '=='*10)
-    os.system(f"{swqa_ssh_login_cmd} 'sudo dpkg -i /home/swqa/{driver_list[index]} && sudo reboot'")
+    driver_name = f"{driver_version}+dkms+glvnd-Ubuntu_amd64.deb"
+    work_date = re.search(r"\d{4}.\d{2}.\d{2}",driver_version)
+    work_date = work_date.group()
+    driver_url = f"https://oss.mthreads.com/product-release/{branch}/{work_date}/{driver_name}"
+    print('=='*10 + f"Downloading {driver_url}" + '=='*10)
+    os.system(f"{swqa_ssh_login_cmd} 'cd /home/swqa/ && wget --no-check-certificate -q {driver_url} -O {driver_name}'")
+    print('=='*10 +  f"sudo dpkg -i {driver_name} && sudo reboot" + '=='*10)
+    os.system(f"{swqa_ssh_login_cmd} 'sudo dpkg -i /home/swqa/{driver_name} && sudo reboot'")
     time.sleep(150)
     try:
         for i in range(3):
@@ -49,48 +53,77 @@ def install_umd_kmd(repo,driver_list,Test_Host_IP,index):
         except:
             print(f"ping {Test_Host_IP} fail!")
             sys.exit(0)
+def install_umd(commit,Test_Host_IP):
+    # pass
+    swqa_ssh_login_cmd = f"sshpass -p gfx123456 ssh swqa@{Test_Host_IP} -o StrictHostKeyChecking=no"
+    print('=='*10 + f"Downloading UMD commit {commit}" + '=='*10)
+    UMD_commit_URL = f"http://oss.mthreads.com/release-ci/gr-umd/{branch}/{commit}_{arch}-mtgpu_linux-xorg-release-hw{glvnd}.tar.gz"
+    os.system(f"{swqa_ssh_login_cmd} 'cd /home/swqa/ && mkdir UMD_fallback && cd UMD_fallback &&  wget --no-check-certificate -q {UMD_commit_URL} -O {commit}_UMD.tar.gz'")
+    os.system(f"{swqa_ssh_login_cmd} 'cd /home/swqa/UMD_fallback ; mkdir {commit}_UMD && sudo tar -xvf  {commit}_UMD.tar.gz -C {commit}_UMD && \
+              cd {commit}_UMD/${arch}-mtgpu_linux-xorg-release/ '")
+    if glvnd == '-glvnd':
+        os.system(f"sudo ./install.sh -g -n -u .")
+        os.system(f"sudo ./install.sh -g -n -s .")
+def install_kmd():
+    pass
 
-def install_driver(repo,driver_list,Test_Host_IP,index):
+def install_driver(repo,driver_version,Test_Host_IP):
     # swqa_ssh_login_cmd = f"sshpass -p gfx123456 ssh swqa@{Test_Host_IP} -o StrictHostKeyChecking=no"
     if repo == 'deb':
-        install_deb(driver_list,download_url,Test_Host_IP,index)
-    elif repo == 'gr-umd' or repo == 'gr-kmd':
-        install_umd_kmd(repo,driver_list,Test_Host_IP,index)
+        install_deb(driver_version,Test_Host_IP)
+    elif repo == 'gr-umd':
+        install_umd(driver_version,Test_Host_IP)
+    elif repo == 'gr-kmd':
+        install_kmd(driver_version,Test_Host_IP)
 
     # 安装驱动后需手动测试，并输入测试结果：
-    rs = input(f"{driver_list[index]}已安装，请执行测试并输入测试结果，或者输入O过滤这笔commit：(Y/N/O)")
+    rs = input(f"{driver_version}已安装，请执行测试并输入测试结果，或者输入O过滤这笔commit：(Y/N/O)")
     if rs == 'O':
         print(f'过滤{driver_list[index]}这笔commit')
     return rs
 
 # 二分查找，需要一个有序的数据类型，
-def middle_search(repo,test_list):
+def middle_search(repo,middle_search_list):
     # left、right初始值为列表元素的序号index 最小值和最大值
     left = 0 
     right = len(driver_list) - 1
     count = 0
     result = []
-    # test_list[0]的value用来存储测试结果，再对vaule的结果进行比对
-    dic1 = {}
+    test_list = []
+    for driver in middle_search_list:
+        test_list.append({driver:None})
+    # test_list列表元素的value用来存储测试结果，再对vaule的结果进行比对
     # 正常来说左边的值应该表示不发生，右边的值表示问题发生；引入区间就在相邻的两个值不相等的元素。
-    Test_Host_IP = umd_fallback.Test_Host_IP
-    test_list[left][list(test_list[left].keys())[0]] = install_driver(repo,driver_list,Test_Host_IP,left)
+    # Test_Host_IP = umd_fallback.Test_Host_IP
+    left_dict = test_list[left]
+    left_dict[list(left_dict.keys())[0]] = install_driver(repo,driver_list,Test_Host_IP,left)
+    left_value = list(left_dict.values())[0]
+    right_dict = test_list[right]
+    right_dict[list(right_dict.keys())[0]] = install_driver(repo,driver_list,Test_Host_IP,right)
+    right_value = list(right_dict.values())[0]
+    # test_list[left][list(test_list[left].keys())[0]] = install_driver(repo,driver_list,Test_Host_IP,left)
     # test_list[list(test_list[left].keys())[0]] = install_driver(repo,driver_list,Test_Host_IP,left)
-    test_list[right][list(test_list[right].keys())[0]] = install_driver(repo,driver_list,Test_Host_IP,right)
-    if test_list[left][list(test_list[left].keys())[0]] == test_list[right][list(test_list[right].keys())[0]]:
+    # test_list[right][list(test_list[right].keys())[0]] = install_driver(repo,driver_list,Test_Host_IP,right)
+    if left_value == right_value:
         print("此区间内，第一个元素和最后一个元素的结果相等，请确认区间范围")
         return None               
     while left <= right -2 :
         middle = (left + right )//2 
         count += 1 
-        test_list[middle][list(test_list[middle].keys())[0]] = install_driver(repo,driver_list,Test_Host_IP,middle)
-        if test_list[middle][list(test_list[middle].keys())[0]] != None and test_list[middle][list(test_list[middle].keys())[0]] == test_list[left][list(test_list[left].keys())[0]]:
+        mid_dict = test_list[left]
+        mid_dict[list(mid_dict.keys())[0]] = install_driver(repo,driver_list,Test_Host_IP,middle)
+        mid_value = list(mid_dict.values())[0]
+        # test_list[middle][list(test_list[middle].keys())[0]] = install_driver(repo,driver_list,Test_Host_IP,middle)
+        # if test_list[middle][list(test_list[middle].keys())[0]] != None and test_list[middle][list(test_list[middle].keys())[0]] == test_list[left][list(test_list[left].keys())[0]]:
+        #     left = middle 
+        # elif test_list[middle][list(test_list[middle].keys())[0]] != None and test_list[middle][list(test_list[middle].keys())[0]] == test_list[right][list(test_list[right].keys())[0]]:
+        #     right = middle 
+        if mid_value != None and mid_value == left_value:
             left = middle 
-        elif test_list[middle][list(test_list[middle].keys())[0]] != None and test_list[middle][list(test_list[middle].keys())[0]] == test_list[right][list(test_list[right].keys())[0]]:
+        elif mid_value != None and mid_value == right_value:
             right = middle 
-    print(f"使用二分法{count}次确认，定位到问题引入范围是 {test_list[left][list(test_list[left].keys())[0]]}(不发生)-{test_list[right][list(test_list[right].keys())[0]]}(发生)之间引入") 
-    # return test_list[left:right]
-    return [test_list[left][list(test_list[left].keys())[0]],test_list[right][list(test_list[right].keys())[0]]]
+    print(f"使用二分法{count}次确认\n\n定位到问题引入范围是 {middle_search_list[left]}(不发生)-{middle_search_list[right]}(发生)之间引入") 
+    return middle_search_list[left:right]
 # def middle_search(repo,driver_list):
 #     # left、right初始值为列表元素的序号index 最小值和最大值
 #     left = 0 
@@ -219,15 +252,24 @@ if __name__ == "__main__":
     umd_list = get_commit.get_git_commit_info("gr-umd", "develop", "2024-02-29 00:00:00", "2024-03-01 00:00:00")
     kmd_list = get_commit.get_git_commit_info("gr-kmd", "develop", "2024-02-29 00:00:00", "2024-03-01 00:00:00")
     index_start, index_end= 0,0
-    for i in umd_list:
-        if i == gr_umd_list[0]:
-            index_start = umd_list.index(i)
-        if i == gr_umd_list[-1]:
-            index_end = umd_list.index(i)
-    umd_list = umd_list[index_start:index_end+1]
-    for i in kmd_list:
-        if i == gr_kmd_list[0]:
-            index_start = kmd_list.index(i)
-        if i == gr_kmd_list[-1]:
-            index_end = kmd_list.index(i)
-    kmd_list = kmd_list[index_start:index_end+1]
+    umd_rs_list = []
+    kmd_rs_list = []
+    for umd in umd_list:
+        if umd_list.index(umd) >= umd_list.index(gr_umd_start_end[0]) and umd_list.index(umd) <= umd_list.index(gr_umd_start_end[1]):
+            umd_rs_list.append({umd:None})
+    for kmd in kmd_list:
+        if kmd_list.index(kmd) >= kmd_list.index(gr_kmd_start_end[0]) and kmd_list.index(kmd) <= kmd_list.index(gr_kmd_start_end[1]):
+            kmd_rs_list.append({umd:None})
+    # for i in umd_list:
+    #     if i == gr_umd_start_end[0]:
+    #         index_start = umd_list.index(i)
+    #     if i == gr_umd_list[-1]:
+    #         index_end = umd_list.index(i)
+    # umd_list = umd_list[index_start:index_end+1]
+    # for i in kmd_list:
+    #     if i == gr_kmd_list[0]:
+    #         index_start = kmd_list.index(i)
+    #     if i == gr_kmd_list[-1]:
+    #         index_end = kmd_list.index(i)
+    # kmd_list = kmd_list[index_start:index_end+1]
+
