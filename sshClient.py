@@ -39,12 +39,13 @@ class sshClient():
         stdin, stdout, stderr = self.client.exec_command(command)
         # stdout为缓冲区，数据都取之后清空
         result = stdout.read().decode().strip('\n')
-        # self.log.logger.info(f"Result: \n{result}")
+        self.log.logger.info(f"Result: \n{result}")
         # print(f"stderr={stderr},type={type(stderr)}")
         # print(f"stderr={stderr.read()},type={type(stderr.read())}")
-        if  stderr.read().decode() != '' and stderr.read().decode() != None:
-            self.log.logger.warning(stderr.read().decode().strip("\n"))
-            # print(f"stderr.read().decode()={stderr.read().decode()}hhh")
+        # if  stderr.read().decode() != '' and stderr.read().decode() != None:
+        if  stderr:
+            error=stderr.read().decode()
+            self.log.logger.warning(error.strip())
         return result   # .replace("\n", " ").strip().split(" ")
 
     def logout(self):
@@ -52,10 +53,12 @@ class sshClient():
         self.client.close()
 
 if __name__ == '__main__':
-    Pc = sshClient("192.168.114.8","swqa","gfx123456")
+    # Pc = sshClient("192.168.114.8","swqa","gfx123456")
+    Pc = sshClient("192.168.220.128","georgy","dell1234")
     if 1000 == Pc.login():
         # result = Pc.execute("wget https://oss.mthreads.com/product-release/develop/20240529/musa_2024.05.29-D+11244+dkms+glvnd-Ubuntu_amd64.deb -O 1.deb")
-        result = Pc.execute("sudo grep 'Driver Version' /sys/kernel/debug/musa/version|awk -F[ '{print $NF}'|awk -F] '{print $1}'")
+        result = Pc.execute("sudo apt install ~/youdao-dict_6.0.0-ubuntu-amd64.deb && echo 'install pass' || echo 'install fail'")
+        # result = Pc.execute("DEBIAN_FRONTEND=noninteractive sudo apt install vainfo -y")
         # print(type(Pc))
         print(f"result={result},type={type(result)}")
         # for line in result.splitlines():

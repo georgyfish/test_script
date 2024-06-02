@@ -7,49 +7,102 @@ import get_commit
 import umd_fallback
 from datetime import datetime
 from sshClient import sshClient
+from logManager import logManager
 
 
 # driver_dic = {'20240326': ['musa_2024.03.26-D+10129', 'https://oss.mthreads.com/release-ci/repo_tags/20240326.txt', 'https://oss.mthreads.com/product-release/develop/20240326/musa_2024.03.26-D+10129+dkms+glvnd-Ubuntu_amd64.deb', 'musa_2024.03.26-D+10129+dkms+glvnd-Ubuntu_amd64.deb'], '20240327': ['musa_2024.03.27-D+10151', 'https://oss.mthreads.com/release-ci/repo_tags/20240327.txt', 'https://oss.mthreads.com/product-release/develop/20240327/musa_2024.03.27-D+10151+dkms+glvnd-Ubuntu_amd64.deb', 'musa_2024.03.27-D+10151+dkms+glvnd-Ubuntu_amd64.deb']}
 # lis1 = ["commit0","commit1","commit2","commit3","commit4","commit5","commit6","commit7","commit8","commit9","commit10","commit11","commit12"]
 # dic1 = {"commit0":"true","commit1":"true","commit2":"true","commit3":"true","commit4":"true","commit5":"true","commit6":"true","commit7":"true","commit8":"true","commit9":"true","commit10":"true","commit11":"true","commit12":"true"}fd
+def ping_host(hostname, count=3, timeout=3, interval=5):
+    """
+    Ping 主机若干次，间隔一段时间
+    :param hostname: 主机名或IP地址
+    :param count: Ping 次数
+    :param timeout: 每次Ping的超时时间
+    :param interval: 每次Ping之间的间隔
+    :return: 是否可以Ping通
+    """
+    for _ in range(count):
+        result = subprocess.run(['ping', '-c', '1', '-W', str(timeout), hostname], \
+             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if result.returncode == 0:
+            return True
+        time.sleep(interval)
+    return False
 
-def install_deb(driver_version,Test_Host_IP):
-    swqa_ssh_login_cmd = f"sshpass -p gfx123456 ssh swqa@{Test_Host_IP} -o StrictHostKeyChecking=no"
+def wget_url(ssh_client,url,destination_folder,file_name=None):
+    # ssh_client = sshClient("192.168.114.8","swqa","gfx123456")
+    log = logManager('ssh')
+    if not file_name :
+        file_name = url.split('/')[-1]
+    destination = f"{destination_folder}/{file_name}"
+    rs = ssh_client.execute(f"wget --no-check-certificate  {url} -O {destination} && echo 'True' ||echo 'False'")
+    if rs == 'False' :
+        print(f"download {url} failed !!!")
+        log.logger.error(f"package {file_name} 下载失败！！！")
+        return False
+    else:
+        log.logger.info(f"package {file_name} 下载成功。")
+        return True
+
+def install_deb(driver_version,Pc):
+    # swqa_ssh_login_cmd = f"sshpass -p gfx123456 ssh swqa@{Test_Host_IP} -o StrictHostKeyChecking=no"
+    log = logManager('ssh')
     driver_name = f"{driver_version}+dkms+glvnd-Ubuntu_amd64.deb"
     work_date = re.search(r"\d{4}.\d{2}.\d{2}",driver_version)
     work_date = work_date.group()
     driver_url = f"https://oss.mthreads.com/product-release/{branch}/{work_date}/{driver_name}"
     print('=='*10 + f"Downloading {driver_url}" + '=='*10)
-    # os.system(f"{swqa_ssh_login_cmd} 'cd /home/swqa/ && wget --no-check-certificate -q {driver_url} -O {driver_name}'")
-    Pc = sshClient("192.168.114.8","swqa","gfx123456")
+    # Pc = sshClient("192.168.114.8","swqa","gfx123456")
     if 1000 == Pc.login():
-        result = Pc.execute(f"cd /home/swqa/ && wget --no-check-certificate -q {driver_url} -O {driver_name} && \
-                            sudo dpkg -i /home/swqa/{driver_name} && sudo reboot")
-        print(result)
+        result = Pc.execute(f"cd /home/swqa/  && mkdir deb_fallback ")
+        destination_folder = "/home/swqa/deb_fallback"
+        rs = wget_url(Pc,driver_url,destination_folder)
+        if not rs:
+            return False
+        # apt install deb 
+        rs = Pc.execute(f"sudo apt install {destination_folder}/{driver_name} -y && \
+             echo 'apt install pass' || echo 'apt install fail'")
+        # check  install command run status;  
+        if 'apt install fail' in rs:
+            log.logger.error(f'"apt install {destination_folder}/{driver_name} -y"执行报错！')
+            return False
+        log.logger.info(f'"apt install {destination_folder}/{driver_name} -y"执行未报错')
+        Pc.execute("sudo reboot")
         Pc.logout()
+
+    # check driver status after reboot 
     # print('=='*10 +  f"sudo dpkg -i {driver_name} && sudo reboot" + '=='*10)
-    # os.system(f"{swqa_ssh_login_cmd} 'sudo dpkg -i /home/swqa/{driver_name} && sudo reboot'")
+    Test_Host_IP = '192.168.114.8'
+    log.logger.info(f"等待远程主机 {Test_Host_IP} 重启...")
     time.sleep(150)
+    if ping_host(Test_Host_IP):
+        log.logger.info(f"远程主机 {Test_Host_IP} 已重新启动")
+    else:
+        log.logger.error(f"远程主机 {Test_Host_IP} 无法重新启动")
+        return False
     try:
-        for i in range(3):
-            # time.sleep(10)
-            ping_rs = os.system(f"timeout 5 ping {Test_Host_IP} -c 1")
-            # if ping_rs == 0 :
-            #     print(f"ping {Test_Host_IP} pass!")
-            deb_version = '0'
-            if 1000 == Pc.login():
-                result = Pc.execute(f"dpkg -s musa")
-                for line in result.splitlines():
-                    if "Version: " in line:
-                        deb_version = line.split("Version: ")[-1]
-                print(deb_version)
-                Pc.logout()
+        deb_version = '0'
+        if 1000 == Pc.login():
+            result = Pc.execute(f"dpkg -s musa")
+            for line in result.splitlines():
+                if "Version: " in line:
+                    deb_version = line.split("Version: ")[-1]
+                # print(deb_version)
+            Pc.logout()
             # if deb_version != '0' and f"{driver_version}+dkms+glvnd" == deb_version and ping_rs == 0:
-            if deb_version != '0' and ping_rs == 0:
-                break
-    except:
-        print(f"ping {Test_Host_IP} fail!")
-        sys.exit(0)
+        if deb_version == driver_version:
+            log.logger.info(f"安装成功，版本号为 {deb_version}")
+            return True
+        elif deb_version != '0' and deb_version != driver_version:
+            log.logger.error(f"安装失败，版本号为 {deb_version}")
+            return False
+        else:
+            log.logger.error(f"包 {driver_name} 未安装成功。")
+            return False
+    finally:
+        pass
+        
 
 def install_umd_kmd(repo,driver_list,Test_Host_IP,index):
     swqa_ssh_login_cmd = f"sshpass -p gfx123456 ssh swqa@{Test_Host_IP} -o StrictHostKeyChecking=no"
@@ -94,12 +147,17 @@ def install_umd(commit):
         Pc.execute("sudo ldconfig && sudo systemctl restart lightdm")
         Pc.logout()
 
+
 def install_kmd(commit):
     print('=='*10 + f"Downloading UMD commit {commit}" + '=='*10)
     KMD_commit_URL = f"http://oss.mthreads.com//sw-build/gr-kmd/{branch}/{commit}_{arch}-mtgpu_linux-xorg-release-hw.tar.gz"
     Pc = sshClient("192.168.114.8","swqa","gfx123456")
     if 1000 == Pc.login():
-        Pc.execute(f"cd /home/swqa/ && mkdir KMD_fallback && cd KMD_fallback && wget {KMD_commit_URL} -O {commit}_KMD.tar.gz && mkdir {commit}_KMD && tar -xvf {commit}_KMD.tar.gz -C {commit}_KMD")
+        rs = Pc.execute(f"cd /home/swqa/ && mkdir KMD_fallback && cd KMD_fallback && wget {KMD_commit_URL} -O {commit}_KMD.tar.gz  && echo yes || echo no")
+        if rs == 'no' :
+            print(f"download KMD {commit} failed !!! Please check {KMD_commit_URL}!!!")
+            sys.exit(-1)
+        Pc.execute(f"cd /home/swqa/KMD_fallback/ && mkdir {commit}_KMD && tar -xvf {commit}_KMD.tar.gz -C {commit}_KMD)")
         # Pc.execute(f"cd /home/swqa/KMD_fallback/ && find {commit}_KMD/ -name mtgpu.ko |awk -F'/' '{print $(NF-2)}'")
         rs = Pc.execute("cd /home/swqa/KMD_fallback/ && find {0}_KMD/ -name mtgpu.ko | awk -F '/' '{print $(NF-2)}' ".format(commit))
         kernel = Pc.execute("uname -r")
@@ -158,20 +216,24 @@ def install_kmd(commit):
     # "${oss_url}/sw-build/gr-kmd/${branch}/${commitID}/${commitID}_${arch}-mtgpu_linux-xorg-release-hw.deb"
     pass
 
-def install_driver(repo,driver_version,Test_Host_IP):
+def install_driver(repo,driver_version,Pc):
     # swqa_ssh_login_cmd = f"sshpass -p gfx123456 ssh swqa@{Test_Host_IP} -o StrictHostKeyChecking=no"
     if repo == 'deb':
-        install_deb(driver_version,Test_Host_IP)
+        rs = install_deb(driver_version,Pc)
     elif repo == 'gr-umd':
-        install_umd(driver_version,Test_Host_IP)
+        rs =install_umd(driver_version,Pc)
     elif repo == 'gr-kmd':
-        install_kmd(driver_version,Test_Host_IP)
-
+        rs = install_kmd(driver_version,Pc)
     # 安装驱动后需手动测试，并输入测试结果：
-    rs = input(f"{driver_version}已安装，请执行测试并输入测试结果，或者输入O过滤这笔commit：(Y/N/O)")
-    if rs == 'O':
-        print(f'过滤{driver_list[index]}这笔commit')
-    return rs
+    test_result = input(f"{driver_version}已安装，请执行测试并输入测试结果:(Y/N)")
+    # 假如安装失败了，需要怎么做？中断？还是继续寻找回退
+    if not rs:
+        return False
+    else:
+        return True
+    # if rs == 'O':
+    #     print(f'过滤{driver_list[index]}这笔commit')
+    # return rs
 
 # 二分查找，需要一个有序的数据类型，
 def middle_search(repo,middle_search_list):
@@ -215,38 +277,6 @@ def middle_search(repo,middle_search_list):
             right = middle 
     print(f"使用二分法{count}次确认\n\n定位到问题引入范围是 {middle_search_list[left]}(不发生)-{middle_search_list[right]}(发生)之间引入") 
     return middle_search_list[left:right]
-# def middle_search(repo,driver_list):
-#     # left、right初始值为列表元素的序号index 最小值和最大值
-#     left = 0 
-#     right = len(driver_list) - 1
-#     count = 0
-#     result = []
-#     # dic1用来存储测试结果
-#     dic1 = {}
-#     # 正常来说左边的值应该表示不发生，右边的值表示问题发生；引入区间就在相邻的两个值不相等的元素。
-#     Test_Host_IP = umd_fallback.Test_Host_IP
-#     dic1[driver_list[left]] = install_driver(repo,driver_list,Test_Host_IP,left)
-#     dic1[driver_list[right]] = install_driver(repo,driver_list,Test_Host_IP,right)
-#     if dic1[driver_list[left]] == dic1[driver_list[right]]:
-#         print("此区间内，第一个元素和最后一个元素的结果相等，请确认区间范围")
-#         return -1
-#     # 当left + 1 =right时，即driver_list[left]、driver_list[right]为相邻元素时，结束循环，right即为引入
-#     while left <= right -2:
-#         #中间值为 left+right的和除2，取商
-#         middle = (left + right)//2 
-#         count += 1
-#         #后续每次只需要去拿到middle 的值
-#         dic1[driver_list[middle]] = install_driver(repo,driver_list,Test_Host_IP,middle)
-#         if dic1[driver_list[middle]] == dic1[driver_list[left]]:
-#                 left = middle 
-#         elif dic1[driver_list[middle]] == dic1[driver_list[right]]:
-#                 right = middle 
-#         # print(f"count={count}")
-#     print(f"使用二分法{count}次确认，定位到问题引入范围是 {driver_list[left]}(不发生)-{driver_list[right]}(发生)之间引入")     
-#         # print(f"对应的deb的repo_tag为{driver_repo_tag[left]},{driver_repo_tag[right]}")
-#         # result = {driver_list[left]:driver_repo_tag[left],driver_list[right]:driver_repo_tag[left]}
-#     # return right
-#     return driver_list[left:right]
 
 if __name__ == "__main__":
     Test_Host_IP = "192.168.114.26"
