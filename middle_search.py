@@ -224,17 +224,19 @@ def install_driver(repo,driver_version,Pc):
         rs =install_umd(driver_version,Pc)
     elif repo == 'gr-kmd':
         rs = install_kmd(driver_version,Pc)
-    # 安装驱动后需手动测试，并输入测试结果：
-    test_result = input(f"{driver_version}已安装，请执行测试并输入测试结果:(Y/N)")
+
+    test_result = ''
     # 假如安装失败了，需要怎么做？中断？还是继续寻找回退
     if not rs:
-        return False
+        test_result = 'install_fail'
+        return test_result
     else:
-        return True
-    # if rs == 'O':
-    #     print(f'过滤{driver_list[index]}这笔commit')
-    # return rs
+        # 安装驱动后需手动测试，并输入测试结果：
+        test_result = testcase()
+        return test_result
 
+def testcase():
+    pass
 # 二分查找，需要一个有序的数据类型，
 def middle_search(repo,middle_search_list):
     # left、right初始值为列表元素的序号index 最小值和最大值
@@ -279,66 +281,66 @@ def middle_search(repo,middle_search_list):
     return middle_search_list[left:right]
 
 if __name__ == "__main__":
-    Test_Host_IP = "192.168.114.26"
-    branch = 'develop'
-    arch = 'x86_64'
-    glvnd = '-glvnd'
-    driver_info_dic = get_deb_version(branch,'20240325', '20240327') 
-    driver_url_list = list(driver_info_dic.values())
-    #  driver_url_list 是列表嵌入列表的格式
-    driver_repo_tag = []
-    driver_url_ls = []
-    driver_dic = {}
-    for i in driver_url_list:
-        driver_dic[i[-1]] = i[2]
-        driver_repo_tag.append(i[1])
+    # Test_Host_IP = "192.168.114.26"
+    # branch = 'develop'
+    # arch = 'x86_64'
+    # glvnd = '-glvnd'
+    # driver_info_dic = get_deb_version(branch,'20240325', '20240327') 
+    # driver_url_list = list(driver_info_dic.values())
+    # #  driver_url_list 是列表嵌入列表的格式
+    # driver_repo_tag = []
+    # driver_url_ls = []
+    # driver_dic = {}
+    # for i in driver_url_list:
+    #     driver_dic[i[-1]] = i[2]
+    #     driver_repo_tag.append(i[1])
 
-    driver_list = list(driver_dic.keys())
-    download_url = list(driver_dic.values())
-    right = middle_search('deb',driver_list)
-    if right == -1:
-        print('此deb区间无法确定到问题引入范围，请往更前找')
-        sys.exit(-1)
-    repo_tag_list = [driver_repo_tag[right - 1],driver_repo_tag[right]]
-    gr_umd_list = []
-    gr_kmd_list = []
-    for repo_tag in repo_tag_list:
-        rs = subprocess.Popen(f"curl {repo_tag}", shell=True, close_fds=True, stdin = subprocess.PIPE, stdout = subprocess.PIPE, stderr = subprocess.PIPE).communicate()
-        repo_tag = eval(rs[0].decode())
-        gr_umd_list.append(repo_tag['gr-umd'][branch])
-        gr_kmd_list.append(repo_tag['gr-kmd'][branch])
-    umd_list = get_commit.get_git_commit_info("gr-umd", "develop", "2024-02-29 00:00:00", "2024-03-01 00:00:00")
-    kmd_list = get_commit.get_git_commit_info("gr-kmd", "develop", "2024-02-29 00:00:00", "2024-03-01 00:00:00")
-    a,b = 0,0
-    for i in umd_list:
-        if i == gr_umd_list[0]:
-            a = umd_list.index(i)
-        if i == gr_umd_list[-1]:
-            b = umd_list.index(i)
-    umd_list = umd_list[a:b+1]
-    for i in kmd_list:
-        if i == gr_kmd_list[0]:
-            a = kmd_list.index(i)
-        if i == gr_kmd_list[-1]:
-            b = kmd_list.index(i)
-    kmd_list = kmd_list[a:b+1]
-    # kmd_url = []
-    # for i in umd_list: 
-    #     umd_url.append(f"http://oss.mthreads.com/release-ci/gr-umd/{branch}/{i}_{arch}-mtgpu_linux-xorg-release-hw{glvnd}.tar.gz")
-    # for i in umd_list: 
-    #     umd_url.append(f"http://oss.mthreads.com/release-ci/gr-umd/{branch}/{i}_{arch}-mtgpu_linux-xorg-release-hw{glvnd}.tar.gz")
-    # 最后拿到一个umd_comp列表，一个umd_url列表；
-    umd_right = middle_search('gr-umd',umd_list)
-    if umd_right == -1:
-        print('umd此区间不存在问题引入，相同kmd驱动，仅更换umd驱动，结果相同。后续将测试kmd引入')
-        kmd_right = middle_search('gr-kmd',kmd_list)
-        if kmd_right == -1 :
-            print('此deb区间确实有问题引入，但更换kmd、umd无法确认引入；')
-            sys.exit(-1)
-        else:
-            print(f'问题引入为{kmd_list[right]}')
-    else:
-        print(f'问题引入为{umd_list[right]}')
+    # driver_list = list(driver_dic.keys())
+    # download_url = list(driver_dic.values())
+    # right = middle_search('deb',driver_list)
+    # if right == -1:
+    #     print('此deb区间无法确定到问题引入范围，请往更前找')
+    #     sys.exit(-1)
+    # repo_tag_list = [driver_repo_tag[right - 1],driver_repo_tag[right]]
+    # gr_umd_list = []
+    # gr_kmd_list = []
+    # for repo_tag in repo_tag_list:
+    #     rs = subprocess.Popen(f"curl {repo_tag}", shell=True, close_fds=True, stdin = subprocess.PIPE, stdout = subprocess.PIPE, stderr = subprocess.PIPE).communicate()
+    #     repo_tag = eval(rs[0].decode())
+    #     gr_umd_list.append(repo_tag['gr-umd'][branch])
+    #     gr_kmd_list.append(repo_tag['gr-kmd'][branch])
+    # umd_list = get_commit.get_git_commit_info("gr-umd", "develop", "2024-02-29 00:00:00", "2024-03-01 00:00:00")
+    # kmd_list = get_commit.get_git_commit_info("gr-kmd", "develop", "2024-02-29 00:00:00", "2024-03-01 00:00:00")
+    # a,b = 0,0
+    # for i in umd_list:
+    #     if i == gr_umd_list[0]:
+    #         a = umd_list.index(i)
+    #     if i == gr_umd_list[-1]:
+    #         b = umd_list.index(i)
+    # umd_list = umd_list[a:b+1]
+    # for i in kmd_list:
+    #     if i == gr_kmd_list[0]:
+    #         a = kmd_list.index(i)
+    #     if i == gr_kmd_list[-1]:
+    #         b = kmd_list.index(i)
+    # kmd_list = kmd_list[a:b+1]
+    # # kmd_url = []
+    # # for i in umd_list: 
+    # #     umd_url.append(f"http://oss.mthreads.com/release-ci/gr-umd/{branch}/{i}_{arch}-mtgpu_linux-xorg-release-hw{glvnd}.tar.gz")
+    # # for i in umd_list: 
+    # #     umd_url.append(f"http://oss.mthreads.com/release-ci/gr-umd/{branch}/{i}_{arch}-mtgpu_linux-xorg-release-hw{glvnd}.tar.gz")
+    # # 最后拿到一个umd_comp列表，一个umd_url列表；
+    # umd_right = middle_search('gr-umd',umd_list)
+    # if umd_right == -1:
+    #     print('umd此区间不存在问题引入，相同kmd驱动，仅更换umd驱动，结果相同。后续将测试kmd引入')
+    #     kmd_right = middle_search('gr-kmd',kmd_list)
+    #     if kmd_right == -1 :
+    #         print('此deb区间确实有问题引入，但更换kmd、umd无法确认引入；')
+    #         sys.exit(-1)
+    #     else:
+    #         print(f'问题引入为{kmd_list[right]}')
+    # else:
+    #     print(f'问题引入为{umd_list[right]}')
 
 
 
