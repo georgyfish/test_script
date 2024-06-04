@@ -8,11 +8,34 @@ import umd_fallback
 from datetime import datetime
 from sshClient import sshClient
 from logManager import logManager
+import test
 
 
 # driver_dic = {'20240326': ['musa_2024.03.26-D+10129', 'https://oss.mthreads.com/release-ci/repo_tags/20240326.txt', 'https://oss.mthreads.com/product-release/develop/20240326/musa_2024.03.26-D+10129+dkms+glvnd-Ubuntu_amd64.deb', 'musa_2024.03.26-D+10129+dkms+glvnd-Ubuntu_amd64.deb'], '20240327': ['musa_2024.03.27-D+10151', 'https://oss.mthreads.com/release-ci/repo_tags/20240327.txt', 'https://oss.mthreads.com/product-release/develop/20240327/musa_2024.03.27-D+10151+dkms+glvnd-Ubuntu_amd64.deb', 'musa_2024.03.27-D+10151+dkms+glvnd-Ubuntu_amd64.deb']}
 # lis1 = ["commit0","commit1","commit2","commit3","commit4","commit5","commit6","commit7","commit8","commit9","commit10","commit11","commit12"]
 # dic1 = {"commit0":"true","commit1":"true","commit2":"true","commit3":"true","commit4":"true","commit5":"true","commit6":"true","commit7":"true","commit8":"true","commit9":"true","commit10":"true","commit11":"true","commit12":"true"}fd
+
+def get_Pc_info(Pc):
+    VALID_OS_TYPE = {"Kylin", "Ubuntu", "uos"}
+    VALID_OS_ARCH_MAP = {"x86_64": "amd64", "aarch64": "arm64", "loongarch64": "loongarch64"}
+    result = {}
+    commands = {
+    "os_type": "cat /etc/lsb-release | head -n 1 | awk -F '='  '{print $2}'",
+    "arch": "dpkg --print-architecture",
+    # "lspci": "lspci",
+    "kernel_version": "uname -r",
+    "driver_version" : "dpkg -s musa musa_all-in-one |grep Version|awk -F: '{print $2}'",
+    "umd_version" : "export DISPLAY=:0.0 && glxinfo -B |grep -i 'OpenGL version string'|awk '{print $NF}'|awk -F '@' '{print $1}'" ,
+    "kmd_version" : "sudo grep 'Driver Version' /sys/kernel/debug/musa/version|awk -F[ '{print $NF}'|awk -F] '{print $1}'",
+    # "glvnd" : ""
+    }
+    for key,command in commands.items():
+        result[key] = Pc.execute(command)
+    result.append()
+    return result
+
+
+
 def ping_host(hostname, count=3, timeout=3, interval=5):
     """
     Ping 主机若干次，间隔一段时间
@@ -48,7 +71,9 @@ def wget_url(ssh_client,url,destination_folder,file_name=None):
 def install_deb(driver_version,Pc):
     # swqa_ssh_login_cmd = f"sshpass -p gfx123456 ssh swqa@{Test_Host_IP} -o StrictHostKeyChecking=no"
     log = logManager('ssh')
-    driver_name = f"{driver_version}+dkms+glvnd-Ubuntu_amd64.deb"
+    rs = get_Pc_info(Pc)
+    glvnd,os_type,arch = rs['glvnd'],rs['os_type'],rs['arch']
+    driver_name = f"{driver_version}+dkms+{glvnd}-{os_type}_{arch}.deb"
     work_date = re.search(r"\d{4}.\d{2}.\d{2}",driver_version)
     work_date = work_date.group()
     driver_url = f"https://oss.mthreads.com/product-release/{branch}/{work_date}/{driver_name}"
@@ -123,9 +148,11 @@ def install_umd_kmd(repo,driver_list,Test_Host_IP,index):
         except:
             print(f"ping {Test_Host_IP} fail!")
             sys.exit(0)
-def install_umd(commit):
+def install_umd(commit,Pc):
     # pass
     # swqa_ssh_login_cmd = f"sshpass -p gfx123456 ssh swqa@{Test_Host_IP} -o StrictHostKeyChecking=no"
+    rs = get_Pc_info(Pc)
+    glvnd,os_type,arch = rs['glvnd'],rs['os_type'],rs['arch']
     print('=='*10 + f"Downloading UMD commit {commit}" + '=='*10)
     UMD_commit_URL = f"http://oss.mthreads.com/release-ci/gr-umd/{branch}/{commit}_{arch}-mtgpu_linux-xorg-release-hw{glvnd}.tar.gz"
     # "${oss_url}/release-ci/gr-umd/${branch}/${commitID}_${arch}-mtgpu_linux-xorg-release-hw${glvnd}.tar.gz"
@@ -148,7 +175,7 @@ def install_umd(commit):
         Pc.logout()
 
 
-def install_kmd(commit):
+def install_kmd(commit,Pc):
     print('=='*10 + f"Downloading UMD commit {commit}" + '=='*10)
     KMD_commit_URL = f"http://oss.mthreads.com//sw-build/gr-kmd/{branch}/{commit}_{arch}-mtgpu_linux-xorg-release-hw.tar.gz"
     Pc = sshClient("192.168.114.8","swqa","gfx123456")
@@ -218,6 +245,8 @@ def install_kmd(commit):
 
 def install_driver(repo,driver_version,Pc):
     # swqa_ssh_login_cmd = f"sshpass -p gfx123456 ssh swqa@{Test_Host_IP} -o StrictHostKeyChecking=no"
+    info = get_Pc_info(Pc)
+    arch = info['arch']
     if repo == 'deb':
         rs = install_deb(driver_version,Pc)
     elif repo == 'gr-umd':
@@ -238,24 +267,27 @@ def install_driver(repo,driver_version,Pc):
 def testcase():
     pass
 # 二分查找，需要一个有序的数据类型，
-def middle_search(repo,middle_search_list):
+def middle_search(repo,middle_search_list,Pc):
     # left、right初始值为列表元素的序号index 最小值和最大值
     left = 0 
-    right = len(driver_list) - 1
+    right = len(middle_search_list) - 1
     count = 0
     result = []
-    test_list = []
-    for driver in middle_search_list:
-        test_list.append({driver:None})
+    # test_list = []
+    # for driver in middle_search_list:
+    #     test_list.append({driver:None})
     # test_list列表元素的value用来存储测试结果，再对vaule的结果进行比对
     # 正常来说左边的值应该表示不发生，右边的值表示问题发生；引入区间就在相邻的两个值不相等的元素。
     # Test_Host_IP = umd_fallback.Test_Host_IP
-    left_dict = test_list[left]
-    left_dict[list(left_dict.keys())[0]] = install_driver(repo,driver_list,Test_Host_IP,left)
-    left_value = list(left_dict.values())[0]
-    right_dict = test_list[right]
-    right_dict[list(right_dict.keys())[0]] = install_driver(repo,driver_list,Test_Host_IP,right)
-    right_value = list(right_dict.values())[0]
+    # left_dict = test_list[left]
+    # left_dict[list(left_dict.keys())[0]] = install_driver(repo,driver_version,Pc)
+    # left_dict[middle_search_list[left]] = install_driver(repo,middle_search_list[left],Pc)
+    # left_value = list(left_dict.values())[0]
+    left_value = install_driver(repo,middle_search_list[left],Pc)
+    # right_dict = test_list[right]
+    # right_dict[list(right_dict.keys())[0]] = install_driver(repo,middle_search_list,right)
+    # right_value = list(right_dict.values())[0]
+    right_value = install_driver(repo,middle_search_list[right],Pc)
     # test_list[left][list(test_list[left].keys())[0]] = install_driver(repo,driver_list,Test_Host_IP,left)
     # test_list[list(test_list[left].keys())[0]] = install_driver(repo,driver_list,Test_Host_IP,left)
     # test_list[right][list(test_list[right].keys())[0]] = install_driver(repo,driver_list,Test_Host_IP,right)
@@ -265,9 +297,10 @@ def middle_search(repo,middle_search_list):
     while left <= right -2 :
         middle = (left + right )//2 
         count += 1 
-        mid_dict = test_list[left]
-        mid_dict[list(mid_dict.keys())[0]] = install_driver(repo,driver_list,Test_Host_IP,middle)
-        mid_value = list(mid_dict.values())[0]
+        # mid_dict = test_list[left]
+        # mid_dict[list(mid_dict.keys())[0]] = install_driver(repo,driver_list,Test_Host_IP,middle)
+        mid_value = install_driver(repo,middle_search_list[middle],Pc)
+        # mid_value = list(mid_dict.values())[0]
         # test_list[middle][list(test_list[middle].keys())[0]] = install_driver(repo,driver_list,Test_Host_IP,middle)
         # if test_list[middle][list(test_list[middle].keys())[0]] != None and test_list[middle][list(test_list[middle].keys())[0]] == test_list[left][list(test_list[left].keys())[0]]:
         #     left = middle 
@@ -280,6 +313,8 @@ def middle_search(repo,middle_search_list):
     print(f"使用二分法{count}次确认\n\n定位到问题引入范围是 {middle_search_list[left]}(不发生)-{middle_search_list[right]}(发生)之间引入") 
     return middle_search_list[left:right]
 
+# global branch 
+branch = test.branch
 if __name__ == "__main__":
     # Test_Host_IP = "192.168.114.26"
     # branch = 'develop'
