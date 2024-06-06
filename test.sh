@@ -146,8 +146,11 @@ function install_kmd() {
         ;;
     N | n)
         echo "执行modprobe -v mtgpu"
-        sudo depmod 
-        sudo modprobe -v mtgpu
+        sudo rmmod mtgpu
+        if [ $? = 0 ];then 
+            sudo depmod 
+            sudo modprobe -v mtgpu      
+        fi
         ;;
     *)
         echo "input error!"
@@ -182,7 +185,7 @@ function install_umd() {
     fi
     if [[ ! -e /etc/ld.so.conf.d/00-mtgpu.conf ]];then
         # echo "/usr/lib/$arch-linux-gnu/musa" > /etc/ld.so.conf.d/00-mtgpu.conf
-        echo -e "/usr/lib/$arch-linux-gnu/musa" |sudo tee /etc/ld.so.conf.d/00-mtgpu.conf
+        echo -e "/usr/lib/$(uname -m)-linux-gnu/musa" |sudo tee /etc/ld.so.conf.d/00-mtgpu.conf
         if [[ "$(uname -m)" == "aarch64" ]]; then
             # echo "/usr/lib/arm-linux-gnueabihf/musa" >> /etc/ld.so.conf.d/00-mtgpu.conf
             echo -e "/usr/lib/arm-linux-gnueabihf/musa" |sudo tee -a /etc/ld.so.conf.d/00-mtgpu.conf
@@ -265,7 +268,7 @@ function usage() {
 -s      # show driver info summary,include KMD/UMD COMMIT INFO;
 -b      # --branch  <develop/release/master/haiguang/kylin>
 -c      # component deb/kmd/umd ;
--i      # install commit;
+-i      # umd/kmd merge commit;
 -h      # --help"
      
 }
