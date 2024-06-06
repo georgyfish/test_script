@@ -91,11 +91,14 @@ def slice_full_list(start_end_list, full_list):
         sys.exit(-1)        
     return full_list[index_start:index_end+1]
 
+begin_date = '20240527'
+end_date = '20240529'
+branch = 'develop'
 
 if __name__ == "__main__":
-    begin_date = '20240527'
-    end_date = '20240529'
-    branch = 'develop'
+    # begin_date = '20240527'
+    # end_date = '20240529'
+    # branch = 'develop'
     driver_full_list = get_deb_version(branch,begin_date, end_date) 
     driver_list = []
     # driver_tag_list = []

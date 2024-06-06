@@ -21,17 +21,19 @@ def get_Pc_info(Pc):
     result = {}
     commands = {
     "os_type": "cat /etc/lsb-release | head -n 1 | awk -F '='  '{print $2}'",
-    "arch": "dpkg --print-architecture",
+    "arch": "uname -m",
     # "lspci": "lspci",
     "kernel_version": "uname -r",
-    "driver_version" : "dpkg -s musa musa_all-in-one |grep Version|awk -F: '{print $2}'",
-    "umd_version" : "export DISPLAY=:0.0 && glxinfo -B |grep -i 'OpenGL version string'|awk '{print $NF}'|awk -F '@' '{print $1}'" ,
-    "kmd_version" : "sudo grep 'Driver Version' /sys/kernel/debug/musa/version|awk -F[ '{print $NF}'|awk -F] '{print $1}'",
+    # "driver_version" : "dpkg -s musa musa_all-in-one |grep Version|awk -F: '{print $2}'",
+    # "umd_version" : "export DISPLAY=:0.0 && glxinfo -B |grep -i 'OpenGL version string'|awk '{print $NF}'|awk -F '@' '{print $1}'" ,
+    # "kmd_version" : "sudo grep 'Driver Version' /sys/kernel/debug/musa/version|awk -F[ '{print $NF}'|awk -F] '{print $1}'",
     # "glvnd" : ""
     }
     for key,command in commands.items():
         result[key] = Pc.execute(command)
-    result.append()
+    result['glvnd'] = '-glvnd'
+    if result['arch'] == 'aarch64':
+        result['arch'] = 'arm64'
     return result
 
 
@@ -129,30 +131,11 @@ def install_deb(driver_version,Pc):
         pass
         
 
-def install_umd_kmd(repo,driver_list,Test_Host_IP,index):
-    swqa_ssh_login_cmd = f"sshpass -p gfx123456 ssh swqa@{Test_Host_IP} -o StrictHostKeyChecking=no"
-    print('=='*10 + f"Downloading UMD commit {driver_list[index]}" + '=='*10)
-    # os.system(f"{swqa_ssh_login_cmd} 'cd /home/swqa/ && wget --no-check-certificate -q {driver_url_list[index]} -O {driver_list[index]}'")
-    repo = repo[-3:]
-    # os.system(f"{swqa_ssh_login_cmd} wget http://192.168.114.118/tool/test.sh")
-    os.system(f"{swqa_ssh_login_cmd} 'cd yq/ && ./test.sh -c {repo} -b develop -i {driver_list[index]}'")
-    if repo == 'kmd':
-        time.sleep(150)
-        try:
-            for i in range(3):
-                # time.sleep(10)
-                ping_rs = os.system(f"timeout 5 ping {Test_Host_IP} -c 1")
-                if ping_rs == 0 :
-                    print(f"ping {Test_Host_IP} pass!")
-                    break
-        except:
-            print(f"ping {Test_Host_IP} fail!")
-            sys.exit(0)
 def install_umd(commit,Pc):
     # pass
     # swqa_ssh_login_cmd = f"sshpass -p gfx123456 ssh swqa@{Test_Host_IP} -o StrictHostKeyChecking=no"
     rs = get_Pc_info(Pc)
-    glvnd,os_type,arch = rs['glvnd'],rs['os_type'],rs['arch']
+    glvnd,arch = rs['glvnd'],rs['arch']
     print('=='*10 + f"Downloading UMD commit {commit}" + '=='*10)
     UMD_commit_URL = f"http://oss.mthreads.com/release-ci/gr-umd/{branch}/{commit}_{arch}-mtgpu_linux-xorg-release-hw{glvnd}.tar.gz"
     # "${oss_url}/release-ci/gr-umd/${branch}/${commitID}_${arch}-mtgpu_linux-xorg-release-hw${glvnd}.tar.gz"
@@ -168,7 +151,7 @@ def install_umd(commit,Pc):
             Pc.execute(f"cd /home/swqa/UMD_fallback/{commit}_UMD/${arch}-mtgpu_linux-xorg-release/ && sudo ./install.sh -u . && sudo ./install.sh -s .")
         rs = Pc.execute("[ -f /etc/ld.so.conf.d/00-mtgpu.conf ] && echo yes  || echo no")
         if rs == 'no' :
-            Pc.execute("echo -e '/usr/lib/{arch}-linux-gnu/musa' |sudo tee /etc/ld.so.conf.d/00-mtgpu.conf")
+            Pc.execute("echo -e '/usr/lib/$(uname -m)-linux-gnu/musa' |sudo tee /etc/ld.so.conf.d/00-mtgpu.conf")
             if Pc.execute("uname -m") == "aarch64":
                 Pc.execute("echo -e '/usr/lib/arm-linux-gnueabihf/musa' |sudo tee -a /etc/ld.so.conf.d/00-mtgpu.conf")
         Pc.execute("sudo ldconfig && sudo systemctl restart lightdm")
@@ -176,6 +159,8 @@ def install_umd(commit,Pc):
 
 
 def install_kmd(commit,Pc):
+    rs = get_Pc_info(Pc)
+    arch = rs['arch']
     print('=='*10 + f"Downloading UMD commit {commit}" + '=='*10)
     KMD_commit_URL = f"http://oss.mthreads.com//sw-build/gr-kmd/{branch}/{commit}_{arch}-mtgpu_linux-xorg-release-hw.tar.gz"
     Pc = sshClient("192.168.114.8","swqa","gfx123456")
@@ -246,7 +231,6 @@ def install_kmd(commit,Pc):
 def install_driver(repo,driver_version,Pc):
     # swqa_ssh_login_cmd = f"sshpass -p gfx123456 ssh swqa@{Test_Host_IP} -o StrictHostKeyChecking=no"
     info = get_Pc_info(Pc)
-    arch = info['arch']
     if repo == 'deb':
         rs = install_deb(driver_version,Pc)
     elif repo == 'gr-umd':
@@ -266,6 +250,7 @@ def install_driver(repo,driver_version,Pc):
 
 def testcase():
     pass
+
 # 二分查找，需要一个有序的数据类型，
 def middle_search(repo,middle_search_list,Pc):
     # left、right初始值为列表元素的序号index 最小值和最大值
@@ -273,39 +258,15 @@ def middle_search(repo,middle_search_list,Pc):
     right = len(middle_search_list) - 1
     count = 0
     result = []
-    # test_list = []
-    # for driver in middle_search_list:
-    #     test_list.append({driver:None})
-    # test_list列表元素的value用来存储测试结果，再对vaule的结果进行比对
-    # 正常来说左边的值应该表示不发生，右边的值表示问题发生；引入区间就在相邻的两个值不相等的元素。
-    # Test_Host_IP = umd_fallback.Test_Host_IP
-    # left_dict = test_list[left]
-    # left_dict[list(left_dict.keys())[0]] = install_driver(repo,driver_version,Pc)
-    # left_dict[middle_search_list[left]] = install_driver(repo,middle_search_list[left],Pc)
-    # left_value = list(left_dict.values())[0]
     left_value = install_driver(repo,middle_search_list[left],Pc)
-    # right_dict = test_list[right]
-    # right_dict[list(right_dict.keys())[0]] = install_driver(repo,middle_search_list,right)
-    # right_value = list(right_dict.values())[0]
     right_value = install_driver(repo,middle_search_list[right],Pc)
-    # test_list[left][list(test_list[left].keys())[0]] = install_driver(repo,driver_list,Test_Host_IP,left)
-    # test_list[list(test_list[left].keys())[0]] = install_driver(repo,driver_list,Test_Host_IP,left)
-    # test_list[right][list(test_list[right].keys())[0]] = install_driver(repo,driver_list,Test_Host_IP,right)
     if left_value == right_value:
         print("此区间内，第一个元素和最后一个元素的结果相等，请确认区间范围")
         return None               
     while left <= right -2 :
         middle = (left + right )//2 
         count += 1 
-        # mid_dict = test_list[left]
-        # mid_dict[list(mid_dict.keys())[0]] = install_driver(repo,driver_list,Test_Host_IP,middle)
         mid_value = install_driver(repo,middle_search_list[middle],Pc)
-        # mid_value = list(mid_dict.values())[0]
-        # test_list[middle][list(test_list[middle].keys())[0]] = install_driver(repo,driver_list,Test_Host_IP,middle)
-        # if test_list[middle][list(test_list[middle].keys())[0]] != None and test_list[middle][list(test_list[middle].keys())[0]] == test_list[left][list(test_list[left].keys())[0]]:
-        #     left = middle 
-        # elif test_list[middle][list(test_list[middle].keys())[0]] != None and test_list[middle][list(test_list[middle].keys())[0]] == test_list[right][list(test_list[right].keys())[0]]:
-        #     right = middle 
         if mid_value != None and mid_value == left_value:
             left = middle 
         elif mid_value != None and mid_value == right_value:
@@ -316,118 +277,46 @@ def middle_search(repo,middle_search_list,Pc):
 # global branch 
 branch = test.branch
 if __name__ == "__main__":
-    # Test_Host_IP = "192.168.114.26"
-    # branch = 'develop'
-    # arch = 'x86_64'
-    # glvnd = '-glvnd'
-    # driver_info_dic = get_deb_version(branch,'20240325', '20240327') 
-    # driver_url_list = list(driver_info_dic.values())
-    # #  driver_url_list 是列表嵌入列表的格式
-    # driver_repo_tag = []
-    # driver_url_ls = []
-    # driver_dic = {}
-    # for i in driver_url_list:
-    #     driver_dic[i[-1]] = i[2]
-    #     driver_repo_tag.append(i[1])
-
-    # driver_list = list(driver_dic.keys())
-    # download_url = list(driver_dic.values())
-    # right = middle_search('deb',driver_list)
-    # if right == -1:
-    #     print('此deb区间无法确定到问题引入范围，请往更前找')
+    Pc = sshClient("192.168.114.55","swqa","gfx123456")
+    if 1000 == Pc.login():
+        info = get_Pc_info(Pc)
+    print(info)
+    # driver_full_list = get_deb_version(branch,'20240325', '20240327') 
+    # driver_list = []
+    # # driver_tag_list = []
+    # for driver in driver_full_list:
+    #     driver_version = driver[0]
+    #     driver_tag = driver[1]
+    #     driver_list.append({driver_version:None})
+    # print(driver_list)
+    # # [{'musa_2024.03.25-D+10109': None}, {'musa_2024.03.26-D+10129': None}, {'musa_2024.03.27-D+10151': None}]
+    # deb_rs_list = middle_search('deb',driver_list)
+    # if deb_rs_list == None:
+    #     print("此deb区间无法确定到问题引入范围")
     #     sys.exit(-1)
-    # repo_tag_list = [driver_repo_tag[right - 1],driver_repo_tag[right]]
-    # gr_umd_list = []
-    # gr_kmd_list = []
-    # for repo_tag in repo_tag_list:
-    #     rs = subprocess.Popen(f"curl {repo_tag}", shell=True, close_fds=True, stdin = subprocess.PIPE, stdout = subprocess.PIPE, stderr = subprocess.PIPE).communicate()
-    #     repo_tag = eval(rs[0].decode())
-    #     gr_umd_list.append(repo_tag['gr-umd'][branch])
-    #     gr_kmd_list.append(repo_tag['gr-kmd'][branch])
+
+    # gr_umd_start_end = []
+    # gr_kmd_start_end = []
+    # for deb in deb_rs_list:
+    #     index_of_deb = driver_full_list.index(deb)
+    #     repo_tag_url = driver_full_list[index_of_deb][1]
+    #     rs = subprocess.Popen(f"curl {repo_tag_url}", shell=True, close_fds=True, stdin = subprocess.PIPE, stdout = subprocess.PIPE, stderr = subprocess.PIPE).communicate()
+    #     repo_tag_dict = eval(rs[0].decode())
+    #     # {'mthreads-gmi': {'develop': '775306fcc', 'master': 'b55a66c9d'}, 'mt-media-driver': {'develop': '2a48bb594'}, 'mt-pes': {'master': 'ff3b990ba'}, 'gr-kmd': {'develop': 'cfb671a2d',\
+    #     #  'release-2.5.0-OEM': '6e65e6285'}, 'graphics-compiler': {'master': '6bfb47527'}, 'm3d': {'master': 'fad16f82a'}, 'vbios': {'master': '79c044773'}, 'ogl': {'master': '757a3724b'}, \
+    #     # 'd3dtests': {'master': 'a88614bcc'}, 'gr-umd': {'develop': 'da0c850b8', 'release-2.5.0-OEM': '3d2e327ca'}, 'wddm': {'develop': '11ba5447c'}}
+    #     gr_umd_start_end.append(repo_tag_dict['gr-umd'][branch])
+    #     gr_kmd_start_end.append(repo_tag_dict['gr-kmd'][branch])
+    # print(gr_umd_start_end,gr_kmd_start_end)
     # umd_list = get_commit.get_git_commit_info("gr-umd", "develop", "2024-02-29 00:00:00", "2024-03-01 00:00:00")
     # kmd_list = get_commit.get_git_commit_info("gr-kmd", "develop", "2024-02-29 00:00:00", "2024-03-01 00:00:00")
-    # a,b = 0,0
-    # for i in umd_list:
-    #     if i == gr_umd_list[0]:
-    #         a = umd_list.index(i)
-    #     if i == gr_umd_list[-1]:
-    #         b = umd_list.index(i)
-    # umd_list = umd_list[a:b+1]
-    # for i in kmd_list:
-    #     if i == gr_kmd_list[0]:
-    #         a = kmd_list.index(i)
-    #     if i == gr_kmd_list[-1]:
-    #         b = kmd_list.index(i)
-    # kmd_list = kmd_list[a:b+1]
-    # # kmd_url = []
-    # # for i in umd_list: 
-    # #     umd_url.append(f"http://oss.mthreads.com/release-ci/gr-umd/{branch}/{i}_{arch}-mtgpu_linux-xorg-release-hw{glvnd}.tar.gz")
-    # # for i in umd_list: 
-    # #     umd_url.append(f"http://oss.mthreads.com/release-ci/gr-umd/{branch}/{i}_{arch}-mtgpu_linux-xorg-release-hw{glvnd}.tar.gz")
-    # # 最后拿到一个umd_comp列表，一个umd_url列表；
-    # umd_right = middle_search('gr-umd',umd_list)
-    # if umd_right == -1:
-    #     print('umd此区间不存在问题引入，相同kmd驱动，仅更换umd驱动，结果相同。后续将测试kmd引入')
-    #     kmd_right = middle_search('gr-kmd',kmd_list)
-    #     if kmd_right == -1 :
-    #         print('此deb区间确实有问题引入，但更换kmd、umd无法确认引入；')
-    #         sys.exit(-1)
-    #     else:
-    #         print(f'问题引入为{kmd_list[right]}')
-    # else:
-    #     print(f'问题引入为{umd_list[right]}')
-
-
-
-
-    driver_full_list = get_deb_version(branch,'20240325', '20240327') 
-    driver_list = []
-    # driver_tag_list = []
-    for driver in driver_full_list:
-        driver_version = driver[0]
-        driver_tag = driver[1]
-        driver_list.append({driver_version:None})
-    print(driver_list)
-    # [{'musa_2024.03.25-D+10109': None}, {'musa_2024.03.26-D+10129': None}, {'musa_2024.03.27-D+10151': None}]
-    deb_rs_list = middle_search('deb',driver_list)
-    if deb_rs_list == None:
-        print("此deb区间无法确定到问题引入范围")
-        sys.exit(-1)
-
-    gr_umd_start_end = []
-    gr_kmd_start_end = []
-    for deb in deb_rs_list:
-        index_of_deb = driver_full_list.index(deb)
-        repo_tag_url = driver_full_list[index_of_deb][1]
-        rs = subprocess.Popen(f"curl {repo_tag_url}", shell=True, close_fds=True, stdin = subprocess.PIPE, stdout = subprocess.PIPE, stderr = subprocess.PIPE).communicate()
-        repo_tag_dict = eval(rs[0].decode())
-        # {'mthreads-gmi': {'develop': '775306fcc', 'master': 'b55a66c9d'}, 'mt-media-driver': {'develop': '2a48bb594'}, 'mt-pes': {'master': 'ff3b990ba'}, 'gr-kmd': {'develop': 'cfb671a2d',\
-        #  'release-2.5.0-OEM': '6e65e6285'}, 'graphics-compiler': {'master': '6bfb47527'}, 'm3d': {'master': 'fad16f82a'}, 'vbios': {'master': '79c044773'}, 'ogl': {'master': '757a3724b'}, \
-        # 'd3dtests': {'master': 'a88614bcc'}, 'gr-umd': {'develop': 'da0c850b8', 'release-2.5.0-OEM': '3d2e327ca'}, 'wddm': {'develop': '11ba5447c'}}
-        gr_umd_start_end.append(repo_tag_dict['gr-umd'][branch])
-        gr_kmd_start_end.append(repo_tag_dict['gr-kmd'][branch])
-    print(gr_umd_start_end,gr_kmd_start_end)
-    umd_list = get_commit.get_git_commit_info("gr-umd", "develop", "2024-02-29 00:00:00", "2024-03-01 00:00:00")
-    kmd_list = get_commit.get_git_commit_info("gr-kmd", "develop", "2024-02-29 00:00:00", "2024-03-01 00:00:00")
-    index_start, index_end= 0,0
-    umd_rs_list = []
-    kmd_rs_list = []
-    for umd in umd_list:
-        if umd_list.index(umd) >= umd_list.index(gr_umd_start_end[0]) and umd_list.index(umd) <= umd_list.index(gr_umd_start_end[1]):
-            umd_rs_list.append({umd:None})
-    for kmd in kmd_list:
-        if kmd_list.index(kmd) >= kmd_list.index(gr_kmd_start_end[0]) and kmd_list.index(kmd) <= kmd_list.index(gr_kmd_start_end[1]):
-            kmd_rs_list.append({umd:None})
-    # for i in umd_list:
-    #     if i == gr_umd_start_end[0]:
-    #         index_start = umd_list.index(i)
-    #     if i == gr_umd_list[-1]:
-    #         index_end = umd_list.index(i)
-    # umd_list = umd_list[index_start:index_end+1]
-    # for i in kmd_list:
-    #     if i == gr_kmd_list[0]:
-    #         index_start = kmd_list.index(i)
-    #     if i == gr_kmd_list[-1]:
-    #         index_end = kmd_list.index(i)
-    # kmd_list = kmd_list[index_start:index_end+1]
+    # index_start, index_end= 0,0
+    # umd_rs_list = []
+    # kmd_rs_list = []
+    # for umd in umd_list:
+    #     if umd_list.index(umd) >= umd_list.index(gr_umd_start_end[0]) and umd_list.index(umd) <= umd_list.index(gr_umd_start_end[1]):
+    #         umd_rs_list.append({umd:None})
+    # for kmd in kmd_list:
+    #     if kmd_list.index(kmd) >= kmd_list.index(gr_kmd_start_end[0]) and kmd_list.index(kmd) <= kmd_list.index(gr_kmd_start_end[1]):
+    #         kmd_rs_list.append({umd:None})
 
