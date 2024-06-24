@@ -1,4 +1,35 @@
 #!/bin/bash
+# 网卡驱动安装
+# 1. 检测网卡
+# 2. 根据网卡型号寻找驱动
+# 3. 安装驱动、启用驱动
+# 4. 检查是否安装成功，网络状态
+
+function install_Netcard_Driver() {
+	# get_Netcard_info
+	Netcard_BusID=`lspci -nn|grep 'Ethernet controller'| grep -oP '\[\K[0-9a-fA-F]{4}:[0-9a-fA-F]{4}(?=\])'`
+	Netcard_ProductName=echo $Netcard_BusID |awk -F: '{print $NF}' 
+
+	# get_netcard_driver & install_net_driver
+	if [ $Netcard_ProductName = 'r8125' ];then
+		#安装r8125驱动
+		if [ $(uname -r) = '5.4.0-42-generic' ];then
+			sudo cp /media/`hostname |awk -F- '{print $1}'`/Ventoy/r8125.ko /lib/modules/`uname -r`/kernel/drivers/net/ethernet/realtek/
+			sudo depmod -a
+			sudo modprobe r8125
+			sleep 5
+			net_check
+		fi
+		echo "Download & install r8125 dkms driver"
+		wget http://192.168.114.118/tool/r8125-9.012.03.tar.bz2
+		sudo tar -xvf r8125-9.012.03.tar.bz2 -C /usr/src
+		cd /usr/src/r8125-9.012.03
+		#需要提前安装编译环境dkms和build-essential
+		dkms_build_env
+		sudo ./autorun.sh
+	fi
+		
+}
 
 #install mc ; mc可以用来下载上传oss上的文件
 function install_mc() {
@@ -94,6 +125,7 @@ function hold-kernel() {
 }
 
 function dkms_build_env() {
+	change_apt_source
 	sudo apt install devscripts debmake debhelper build-essential dkms -y
 	sudo sed -i 's/# autoinstall_all_kernels/autoinstall_all_kernels/g' /etc/dkms/framework.conf  #修改dkms默认配置
 }
