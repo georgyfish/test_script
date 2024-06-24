@@ -2,6 +2,10 @@
 
 function check_para() {
     primary_gpu=$1
+    if (( $card_cnt < 2));then
+        echo "识别显卡数量大于1才可切换"
+        exit 1
+    fi
     if [[ $# == 0 ]];then 
         check_current
     fi
@@ -24,10 +28,6 @@ function check_para() {
         exit 1
     fi
     # 边界值，card0-n应当小于显卡数量;显卡数量应大于等于2；
-    if (( $card_cnt < 2));then
-        echo "识别显卡数量大于1才可切换"
-        exit 1
-    fi
     cardID=`echo $primary_gpu |awk -F 'card' '{print $2}'`
     if [[ $cardID -gt $(expr $card_cnt - 1) ]] ;then 
         echo "GPU序号错误"
@@ -102,18 +102,6 @@ EndSection
     echo "$xorg" > ~/xorg.conf
 }
 
-# """
-# 多卡环境下如何检查哪张显卡是primary gpu呢；
-#     查看Xorg日志：
-#     lightdm Xorg log path: "/var/log/Xorg.0.log"
-#     gdm3 Xorg log path: "~/.local/share/xorg/Xorg.0.log"
-# 	MTGPU(0) 对应的card应该才是 primary GPU；如果是集显、A卡、N卡？
-#     MTGPU(G0) 对应的card才是 secondary gpu; 
-# 当前机器上的card0 \card1 分别是哪张显卡呢，输出对应的显卡信息；
-# 当前机器上的primary gpu？
-# """
-
-
 
 function check_primarygpu() {
     # 检查 $primary_gpu 和 $current_PrimaryGPU的值是否相同；
@@ -128,14 +116,27 @@ function check_primarygpu() {
 
 }
 function check_current() {
+    # current_PrimaryGPU=`grep "(0): using drv /dev/dri/card" $Xorg_log_path |awk  -F"/dev/dri/" '{print $2}'`
+    # secondaryGPU=`grep "(G0): using drv /dev/dri/card" $Xorg_log_path |awk  -F"/dev/dri/" '{print $2}'`
+    # current_PrimaryGPU_busID=$(find  /sys/devices/ -name $current_PrimaryGPU |grep drm |awk -F"/" '{print $(NF-2)}'|awk -F: '{print $2":"$3}')
+    # current_PrimaryGPU_info=$(lspci |grep $current_PrimaryGPU_busID)
+    # secondaryGPU_busID=$(find  /sys/devices -name $secondaryGPU |grep drm |awk -F"/" '{print $(NF-2)}'|awk -F: '{print $2":"$3}')
+    # secondaryGPU_info=$(lspci |grep $secondaryGPU_busID)
+    # echo "当前PrimaryGPU是 $current_PrimaryGPU : $current_PrimaryGPU_info"
+    # echo "当前SecondaryGPU是 $secondaryGPU : $secondaryGPU_info"
     current_PrimaryGPU=`grep "(0): using drv /dev/dri/card" $Xorg_log_path |awk  -F"/dev/dri/" '{print $2}'`
-    secondaryGPU=`grep "(G0): using drv /dev/dri/card" $Xorg_log_path |awk  -F"/dev/dri/" '{print $2}'`
     current_PrimaryGPU_busID=$(find  /sys/devices/ -name $current_PrimaryGPU |grep drm |awk -F"/" '{print $(NF-2)}'|awk -F: '{print $2":"$3}')
     current_PrimaryGPU_info=$(lspci |grep $current_PrimaryGPU_busID)
-    secondaryGPU_busID=$(find  /sys/devices -name $secondaryGPU |grep drm |awk -F"/" '{print $(NF-2)}'|awk -F: '{print $2":"$3}')
-    secondaryGPU_info=$(lspci |grep $secondaryGPU_busID)
+    for GPU in $(ls /dev/dri/card* |grep -v $current_PrimaryGPU)
+    do
+        secondaryGPU=$(echo "$GPU" | awk -F/ '{print $NF}')
+        secondaryGPU_busID=$(find  /sys/devices -name $secondaryGPU |grep drm |awk -F"/" '{print $(NF-2)}'|awk -F: '{print $2":"$3}')
+        secondaryGPU_info=$(lspci |grep $secondaryGPU_busID)
+        echo "当前SecondaryGPU是 $secondaryGPU : $secondaryGPU_info"
+    done
     echo "当前PrimaryGPU是 $current_PrimaryGPU : $current_PrimaryGPU_info"
-    echo "当前SecondaryGPU是 $secondaryGPU : $secondaryGPU_info"
+    #echo "当前SecondaryGPU是 $secondaryGPU : $secondaryGPU_info"
+
 }
 
 dm=$(cat /etc/X11/default-display-manager |awk -F/ '{print $NF}') 
@@ -146,7 +147,11 @@ if [ $dm = 'lightdm' ];then
 elif [ $dm = 'gdm3' ];then
     Xorg_log_path="$HOME/.local/share/xorg/Xorg.0.log";
 else
-    echo "check dm"
+    echo "请检查xorg日志路径！"
+fi
+if [ ! -f $Xorg_log_path ];then
+    echo "请检查$dm状态及是否登录， systemctl status $dm "
+    exit 1
 fi
 
 echo "Xorg_log_path=$Xorg_log_path"
