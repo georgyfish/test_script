@@ -7,11 +7,11 @@
 
 function install_Netcard_Driver() {
 	# get_Netcard_info
-	Netcard_BusID=`lspci -nn|grep 'Ethernet controller'| grep -oP '\[\K[0-9a-fA-F]{4}:[0-9a-fA-F]{4}(?=\])'`
-	Netcard_ProductName=echo $Netcard_BusID |awk -F: '{print $NF}' 
+	Netcard_BusID=$(lspci -nn|grep 'Ethernet controller'| grep -oP '\[\K[0-9a-fA-F]{4}:[0-9a-fA-F]{4}(?=\])')
+	Netcard_ProductName=$(echo "$Netcard_BusID" |awk -F: '{print $NF}')
 
 	# get_netcard_driver & install_net_driver
-	if [ $Netcard_ProductName = 'r8125' ];then
+	if [ "$Netcard_ProductName" = 'r8125' ];then
 		#安装r8125驱动
 		if [ $(uname -r) = '5.4.0-42-generic' ];then
 			sudo cp /media/`hostname |awk -F- '{print $1}'`/Ventoy/r8125.ko /lib/modules/`uname -r`/kernel/drivers/net/ethernet/realtek/
@@ -23,9 +23,9 @@ function install_Netcard_Driver() {
 		echo "Download & install r8125 dkms driver"
 		wget http://192.168.114.118/tool/r8125-9.012.03.tar.bz2
 		sudo tar -xvf r8125-9.012.03.tar.bz2 -C /usr/src
+		dkms_build_env
 		cd /usr/src/r8125-9.012.03
 		#需要提前安装编译环境dkms和build-essential
-		dkms_build_env
 		sudo ./autorun.sh
 	fi
 		
@@ -143,6 +143,7 @@ function download_xctool() {
 	wget http://192.168.114.118/xc_tool.tgz
 	echo "解压xc_tool.tgz"
 	tar zxf xc_tool.tgz
+	cd /home/swqa/xc_tool ; ./init_xc_env.sh
 }
 
 function lightdm_autologin() {
@@ -157,10 +158,10 @@ function init() {
 	x="$(pwd)"
 	echo "工作路径：$x/xc_tool" 
 	cd ~/xc_tool
-	sed -i 's/install_ltp/#install_ltp/g' ~/xc_tool/init_xc_env.sh
-	sed -i 's/function #install_ltp/function install_ltp/g' ~/xc_tool/init_xc_env.sh 
-	sed -i 's/install_gfxbench/#install_gfxbench/g' ~/xc_tool/init_xc_env.sh
-	sed -i 's/function #install_gfxbench/function install_ltp/g' ~/xc_tool/init_xc_env.sh 
+	# sed -i 's/install_ltp/#install_ltp/g' ~/xc_tool/init_xc_env.sh
+	# sed -i 's/function #install_ltp/function install_ltp/g' ~/xc_tool/init_xc_env.sh 
+	# sed -i 's/install_gfxbench/#install_gfxbench/g' ~/xc_tool/init_xc_env.sh
+	# sed -i 's/function #install_gfxbench/function install_ltp/g' ~/xc_tool/init_xc_env.sh 
 	./init_xc_env.sh
 }
 
@@ -197,31 +198,20 @@ function install_driver() {
 
 function install_env() {
 	#安装网卡驱动---联网成功--修改镜像源---下载xc_tool--执行初始化脚本--
-	r8125_Kernel_54
-	net_check
-	change_apt_source
-	#install_tools
-	#system_settings
-	download_xctool
-	init
+	# r8125_Kernel_54
+	# net_check
+	# change_apt_source
+	# #install_tools
+	# #system_settings
+	# download_xctool
+	# init
+	# install_mc
+	# build_r8125_dkms_driver
+	# #install_driver 
+	install_Netcard_Driver
 	install_mc
-	build_r8125_dkms_driver
-	#install_driver 
+	download_xctool
 	echo "初始化环境成功！Need reboot to work!!!"
 }
-
-# read -r -p "请输入需要安装的驱动版本：" input
-# #输入 不输入或者空格---默认是最新的驱动 当天日期`date +%Y%m%d`，日期格式`20230221`----版本`2023-02-22`,其他输入---提示格式错误
-# if $input == '' | $input == ' '
-# then 
-# 	driver_version= `date +%Y%m%d` #最新驱动，默认最新日期来找，最新日期没有的话，往前找最新
-# if echo $input | grep -Eq "[0-9]{4}[0-9]{2}[0-9]{2}" && date -d $input +%Y%m%d > /dev/null 2>&1 
-# then 
-# 	echo "输入格式正确"
-# 	driver_version=`date -d $input +%Y%m%d`
-# else
-#   echo "输入的日期格式不正确，应为yyyymmdd";
-#   exit 1;
-
 
 install_env 
