@@ -6,6 +6,18 @@ import time
 import sys
 import random,itertools
 
+
+
+'''
+测试进度可视化----读取接口信息，按照接口信息列出当前接口组合、执行完成接口组合、待完成接口组合、总共所有接口组合；
+before test;
+    测试前，初始化，显示模式恢复默认，扩展模式，xrandr --output DP-1 --auto
+run test;
+    xrandr --output 
+after test;
+    HWR/dmesg 读取; log
+'''
+
 def get_vga_card_info():
     """
     get_vga_card_info
@@ -172,7 +184,7 @@ def run_duplicate_mode(config):
     for i in range(len(modes)):
         if resolution[i] == resolution_sort[0]:
             mode = modes[i]
-    cmd = 'export DISPLAY=:0.0 && xrandr --output {mode} --auto '
+    cmd = f'export DISPLAY=:0.0 && xrandr --output {mode} --auto '
     for i in range(len(modes)):
         if resolution[i] != resolution_sort[0]:
             cmd += f"&& xrandr --output {modes[i]} --mode {resolution_sort[0]} --auto "
