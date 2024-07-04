@@ -357,12 +357,12 @@ function main() {
             fi
         fi
         net_check
-        echo "[INFO] sudo systemctl stop lightdm"
-        sudo systemctl stop lightdm
+        echo "[INFO] sudo systemctl stop $dm_type"
+        sudo systemctl stop $dm_type
         download_${component} $commitID
         install_${component} $commitID
-        echo "[INFO] sudo systemctl restart lightdm"
-        sudo systemctl restart lightdm
+        echo "[INFO] sudo systemctl start $dm_type"
+        sudo systemctl start $dm_type
     fi
     
     
@@ -379,7 +379,7 @@ glvnd="-glvnd"
 # if [ $os_type = "Kylin" ];then 
 #     glvnd=''
 # fi
- 
+dm_type=$(cat /etc/X11/default-display-manager |awk -F/ '{print $NF}') 
 main "$@"
 
 
