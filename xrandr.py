@@ -75,6 +75,23 @@ def get_current_display_mode():
                 result[device_name][mode] = rs.group(4)
     return result
 
+def before_test(config):
+    '''
+    before test set mode max resolution
+    '''
+    cmd = f"export DISPLAY=:0 "
+    modes = list(config.keys())
+    for i in range(len(modes)):
+        cmd += f"&& xrandr --output {modes[i]} --auto "
+    print(cmd)
+    rs = subprocess.Popen(cmd,shell=True)
+    if rs.returncode == 0 :
+        print("Command executed successfully.")
+    time.sleep(10)
+    if not check_status:
+        return False
+
+        
 
 
 def get_best_display_mode():
@@ -130,7 +147,7 @@ def run_display_mode(config, times):
         if not check_status():
             return False
 
-# xrandr左右屏设置，xrandr主屏及左右屏设置
+# xrandr扩展、左右屏设置，xrandr主屏及左右屏设置
 def run_xrandr_extend_mode(config, times):
     print("="*30 + "run_xrandr_extend_mode" + "="*30)
     modes = list(config.keys())
@@ -187,8 +204,8 @@ def run_duplicate_mode(config):
     cmd = f'export DISPLAY=:0.0 && xrandr --output {mode} --auto '
     for i in range(len(modes)):
         if resolution[i] != resolution_sort[0]:
-            cmd += f"&& xrandr --output {modes[i]} --mode {resolution_sort[0]} --auto "
-            cmd += f"&& xrandr --output {modes[i]}  --same-as {mode} "
+            cmd += f"&& xrandr --output {modes[i]} --mode {resolution_sort[0]} --auto --same-as {mode}"
+            # cmd += f"&& xrandr --output {modes[i]}  --same-as {mode} "
         elif modes[i] != mode:
             cmd += f"&& xrandr --output {modes[i]}  --same-as {mode} "
     print(cmd)
@@ -196,6 +213,7 @@ def run_duplicate_mode(config):
     time.sleep(10)
     if not check_status:
         return False
+    print("="*30 + "duplicate_mode test complete" + "="*30)
 
 # 复制、扩展模式切换
 def run_duplicate_switch_extend_mode(config,times):
