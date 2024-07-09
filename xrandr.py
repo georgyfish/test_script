@@ -84,7 +84,8 @@ def before_test(config):
     for i in range(len(modes)):
         cmd += f"&& xrandr --output {modes[i]} --auto "
     print(cmd)
-    rs = subprocess.Popen(cmd,shell=True)
+    rs = subprocess.Popen(cmd, shell=True, close_fds=True, stdin = subprocess.PIPE, stdout = subprocess.PIPE, stderr = subprocess.PIPE, preexec_fn = os.setsid)
+    stdout,stderr = rs.communicate(timeout=10)
     if rs.returncode == 0 :
         print("Command executed successfully.")
     time.sleep(10)
@@ -392,10 +393,11 @@ if __name__ == "__main__":
     # run_duplicate_mode(current)
     # config = {'HDMI-1':{'1920x1080':'60.00'},'DP-1':{'2560x1440':'60'},'DP-2':{'2560x1440':'60'}}
     # current = {'HDMI-1':{'1920x1080':'60.00'},'DP-1':{'2560x1440':'60'},'DP-2':{'2560x1440':'60'}}
-    run_extend_switch_only_mode(config,times)
-    run_duplicate_switch_extend_mode(config,times)
-    run_primary_switch(config,times)
-    run_only_mode(config,times)
-    run_xrandr_extend_mode(config, times)
-    run_duplicate_mode(current)
+    # run_extend_switch_only_mode(config,times)
+    # run_duplicate_switch_extend_mode(config,times)
+    # run_primary_switch(config,times)
+    # run_only_mode(config,times)
+    # run_xrandr_extend_mode(config, times)
+    # run_duplicate_mode(current)
     #run_duplicate_switch_only_mode(config, times)
+    before_test(config)
