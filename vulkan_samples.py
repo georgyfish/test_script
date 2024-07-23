@@ -18,7 +18,8 @@ valid_app_list=[
 glTF_Asset_path = f"/home/swqa/xc_tool/tool/glTF-Sample-Assets/Models"
 def download_glTF_Assets():
     os.chdir("/home/swqa/xc_tool/tool")
-    os.system("wget http://192.168.114.118/tool/UE/sample/glTF_Sample.tgz -O glTF_Sample.tgz \
+    if not os.path.exists(glTF_Asset_path):
+        os.system("wget http://192.168.114.118/tool/UE/sample/glTF_Sample.tgz -O glTF_Sample.tgz \
             && tar -xvf glTF_Sample.tgz")
 
 def get_filelist(app,path):
@@ -32,6 +33,7 @@ def get_filelist(app,path):
         bin_paths =  [f"{Khrons_path}/api",f"{Khrons_path}/extensions",f"{Khrons_path}/performance"]
     else:
         # Vulkan-glTF-PBR 需下载Assets
+        download_glTF_Assets()
         bin_paths = [f"{glTF_Asset_path}"]
         pass
     # cmd = f"find {base_path}/{bin_path} -type f -executable -print0 | xargs -0 ls"
@@ -103,7 +105,7 @@ def args():
     help_info = "Vulkan Samples test, use \"tail -f /home/swqa/record.log\" to record \n'vulkan-basic-samples' use '/vulkan-basic-samples/build/API-Samples/run_all_samples.sh' "
     parser = argparse.ArgumentParser(description=help_info)
     parser.add_argument('--app', type=str, choices=valid_app_list, help=f'Use vaild app in {valid_app_list}',required=True)
-    parser.add_argument('--demo_name',type=str,help="Use --demo_name to start with demo_name")
+    parser.add_argument('--demo',type=str,help="Use --demo_name to start with demo_name")
     args = parser.parse_args()
     return args
 
@@ -114,10 +116,10 @@ if __name__ == "__main__":
     app = args.app
     filelist = get_filelist(app,base_path)
     print(f"{filelist}")
-    if args.demo_name:
-        demo_name = args.demo_name
+    if args.demo:
+        demo_name = args.demo
         if demo_name in filelist:
-            id = filelist.index(sys.argv[2])
+            id = filelist.index(demo_name)
             Run(app,base_path,filelist[id:])
         else:
             print(f"{demo_name} not in {app} execute demo list")
