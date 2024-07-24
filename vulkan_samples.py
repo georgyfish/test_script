@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/bin/python3
 
 import os 
 import time
@@ -13,6 +13,45 @@ valid_app_list=[
     'Vulkan-glTF-PBR',
     'SaschaWillems-Vulkan'
     ]
+help_info = """
+# Auto Run (没有加检查)
+./vulkan_samples.py <app name> [--demo compute_nbody]
+按`ESC`退出demo, 按`Enter`或者`y`进入下一个demo ;
+Use `tail -f /home/swqa/record.log` to check record ;
+
+# Manual Run
+## Khronos Vulkan Samples
+```
+cd Khronos-Vulkan-Samples/build/linux/app/bin/Debug/x86_64/
+./vulkan_samples sample hello_triangle
+```
+
+## SaschaWillems
+```
+cd SaschaWillems-Vulkan/build/bin
+./bloom
+```
+
+## BobLChen/VulkanDemos
+
+```
+cd VulkanDemos-BoblChen/build/examples
+./2_Triangle
+```
+
+## vulkan-basic-samples
+```
+cd vulkan-basic-samples/build/API-Samples
+./15-draw_cube
+run_all_samples.sh
+```
+
+## Vulkan-glTF-PBR
+```
+cd Vulkan-glTF-PBR/bin
+./Vulkan-glTF-PBR
+```
+"""
 # base_path = subprocess.run(['pwd'], capture_output=True, text=True, check=True).stdout
 # print(base_path)
 glTF_Asset_path = f"/home/swqa/xc_tool/tool/glTF-Sample-Assets/Models"
@@ -88,7 +127,7 @@ def Run(app,base_path,filelist):
             os.system(command)
             time.sleep(1)
             user_input = input("输入y继续：")
-            if user_input == 'y' or user_input == '':
+            if user_input == 'y' or user_input == 'Y' or user_input == '':
                 pass
             else:
                 quit()
@@ -102,15 +141,18 @@ def Get_Structure():
     return structure
 
 def args():
-    help_info = "Vulkan Samples test, use \"tail -f /home/swqa/record.log\" to record \n'vulkan-basic-samples' use '/vulkan-basic-samples/build/API-Samples/run_all_samples.sh' "
-    parser = argparse.ArgumentParser(description=help_info)
-    parser.add_argument('--app', type=str, choices=valid_app_list, help=f'Use vaild app in {valid_app_list}',required=True)
+    parser = argparse.ArgumentParser(description=help_info,formatter_class=argparse.RawDescriptionHelpFormatter)
+    # 添加位置参数
+    parser.add_argument('app', type=str, choices=valid_app_list, help=f'选择一个Samples {valid_app_list}')
+    # 添加可选参数
     parser.add_argument('--demo',type=str,help="Use --demo_name to start with demo_name")
+    # 解析参数
     args = parser.parse_args()
     return args
 
 if __name__ == "__main__":
     structure = Get_Structure()
+    # VulkanSample目录
     base_path =  "/home/swqa/VulkanSample/VulkanSample"
     args = args()
     app = args.app
@@ -126,3 +168,4 @@ if __name__ == "__main__":
             sys.exit(0)
     else:
         Run(app,base_path,filelist)
+    print(help_info)
